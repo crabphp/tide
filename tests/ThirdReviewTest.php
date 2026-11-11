@@ -45,6 +45,30 @@ final class ThirdReviewTest extends DatabaseTestCase
     }
 
     #[DataProvider('drivers')]
+    public function testAnEmptyAlternativeAfterARealFilterAddsNothing(string $driver): void
+    {
+        $this->start($driver);
+        $this->db->table('tide_categories')->insert(['id' => 4, 'parent_id' => 1, 'name' => 'sibling']);
+        $this->db->table('tide_categories')->insert(['id' => 5, 'parent_id' => 2, 'name' => 'sibling']);
+        foreach ([
+            static fn(ModelQuery $query): ModelQuery => $query->orWhere([]),
+            static fn(ModelQuery $query): ModelQuery => $query->orWhere(static fn(ModelQuery $group): ModelQuery => $group->when(false, static fn(ModelQuery $q): ModelQuery => $q->where(
+                'id',
+                2,
+            ))),
+        ] as $optional) {
+            $query = $optional(Category::find(1)->related('children')->where('name', 'sibling'));
+            self::assertSame([4], $query->pluck('id'));
+        }
+        $query = Category::find(1)->related('children')->where('name', 'sibling')->orWhere([]);
+        self::assertSame(1, $query->update(['name' => 'renamed']));
+        self::assertSame('child', $this->db->table('tide_categories')->where('id', 2)->value('name'));
+        // A real alternative still counts, and still stays inside the parent.
+        $either = Category::find(1)->related('children')->where('name', 'renamed')->orWhere('name', 'child');
+        self::assertSame([2, 4], $either->orderBy('id')->pluck('id'));
+    }
+
+    #[DataProvider('drivers')]
     public function testColumnsGivenToReadsAndChunksOfAManyToManyRelationAreTheRelatedModels(string $driver): void
     {
         $this->start($driver);

@@ -597,8 +597,13 @@ final class ModelQuery
             $scope = $this->scope;
             // (parent AND a) OR (parent AND b) keeps the parent outside the user's OR.
             $this->query->orWhere(static function (Query $branch) use ($scope, $method, $arguments): void {
-                $scope($branch);
+                $empty = $branch->toSql();
                 $branch->where(static fn(Query $group): Query => $group->{$method}(...$arguments));
+                // An alternative that adds nothing is none: without the parent's condition either,
+                // the branch is empty and the builder leaves it out.
+                if ($branch->toSql() !== $empty) {
+                    $scope($branch);
+                }
             });
             return;
         }
