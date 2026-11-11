@@ -140,6 +140,16 @@ $book->save();
 
 A model that declares `created_at` and `updated_at` as dates has them kept, in PHP's default time zone, the one they are read back in: both when it is first saved, and `updated_at` at each change, bulk `update()`, `increment()` and `decrement()` included. A time you set yourself is written as you set it, and a save that changes nothing writes nothing. The time is the application's clock, to the second.
 
+Many new models of one class are inserted together with `insertMany()`, which returns how many rows it inserted:
+
+```php
+// insert-many.php
+$drafts = [new Book('First', $author->id), new Book('Second', $author->id)];
+$count = Book::insertMany($drafts);   // 2
+```
+
+Each is written as `save()` writes it. A model whose key you gave is stored afterwards. One whose key the database numbers stays new, without its key, since a database tells only the first of several; read the rows back where you need them. Thousands of rows are sent in parts of 500.
+
 A null property is left out of the insert, so the database gives the column its default, or null when it has none. The model learns what the database filled when you `refresh()` it. On a stored model null is a value like any other, and assigning it writes null.
 
 Changing a foreign key and saving unsets its loaded `BelongsTo` property. Assigning a relation itself changes no foreign key. Arrays and scalars compare strictly, dates by their instant, and cast objects by their written value, including mutations inside them. Mutable `DateTime` values held by `DateTimeInterface` or `mixed` columns are snapshotted as immutable copies, so in-place date changes are detected. A failed statement leaves the snapshot untouched so you can correct the model and save again.

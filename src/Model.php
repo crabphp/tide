@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Crab\Tide;
 
 use Crab\Contracts\Database\Connection;
+use Crab\Contracts\Database\Field;
 
 abstract class Model implements \JsonSerializable
 {
@@ -56,55 +57,10 @@ abstract class Model implements \JsonSerializable
         $key = $map->requireKey();
         $values = $map->values($this);
         if ($this->storedValues === null) {
-            // Zero is what an int property holds before the database numbers the row; MySQL takes it as a request for a number too.
-            if (($values[$key->property] ?? null) === 0) {
-                unset($values[$key->property]);
-            }
-            $givenKey = array_key_exists($key->property, $values);
-            if (!$givenKey && $key->type === 'string') {
-                throw new \LogicException(
-                    static::class . "::\${$key->property} is a string key; give it a value before save().",
-                );
-            }
-            // The times #[Timestamps] keeps, where the application gave none.
-            $stamps = $before = [];
-            foreach (array_filter([$map->createdAt, $map->updatedAt]) as $stamp) {
-                if (($values[$stamp->property] ?? null) !== null) {
-                    continue;
-                }
-                $before[$stamp->property] = array_key_exists($stamp->property, $values);
-                $stamps[$stamp->property] = $values[$stamp->property] = Tide::now();
-            }
-            $written = [];
-            foreach ($values as $name => $value) {
-                // Null is left to the database: its default for the column, or null.
-                if ($value === null) {
-                    continue;
-                }
-                $field = $map->fields[$name];
-                $written[$field->column] = $field->toColumn($value);
-            }
-            if ($written === []) {
-                throw new \LogicException(static::class
-                . '::save() has no value to write; give at least one column a value before saving.');
-            }
+            [$written, $givenKey, $stamps, $before] = $this->insertion($map, $key, $values);
             $connection = Tide::database($map->database)->current();
             $id = $connection->table($map->table)->insert($written);
-            // Undone, the key the database gave and the times Tide wrote are forgotten too.
-            $forget = $givenKey ? [] : [$key->property => false];
-            $this->undoneBy($map, $connection, null, [...$forget, ...$before]);
-            foreach ($stamps as $name => $value) {
-                $map->assign($this, $name, $value);
-            }
-            if (!$givenKey) {
-                $id = $key->fromColumn($id);
-                $map->assign($this, $key->property, $id);
-            }
-            $stored = [];
-            foreach ($map->values($this) as $name => $value) {
-                $stored[$name] = $map->snapshot($map->fields[$name], $value);
-            }
-            $this->storedValues = $stored;
+            $this->inserted($map, $key, $connection, $givenKey, $stamps, $before, $id);
             return $this;
         }
         $written = $changed = [];
@@ -160,6 +116,137 @@ abstract class Model implements \JsonSerializable
             unset($this->{$name});
         }
         return $this;
+    }
+
+    /**
+     * Inserts new models of this class in as few statements as can hold them, and
+     * returns how many rows were inserted. Each is written as save() writes it: its
+     * values converted, its times kept, a null left to the database. A model whose
+     * key was given is stored afterwards, as after save(). One whose key the database
+     * numbers stays new, without its key, since a database tells only the first of
+     * several: read the rows back where they are needed.
+     *
+     * @param list<static> $models
+     */
+    public static function insertMany(array $models): int
+    {
+        if ($models === []) {
+            return 0;
+        }
+        $map = ModelMap::of(static::class);
+        $key = $map->requireKey();
+        $seen = [];
+        foreach ($models as $model) {
+            if (!$model instanceof static || $model::class !== static::class) {
+                throw new \LogicException(static::class
+                . '::insertMany() takes models of that class; insert one class at a time.');
+            }
+            if ($model->stored()) {
+                throw new \LogicException(static::class
+                . '::insertMany() takes new models; save() writes a stored one.');
+            }
+            if (isset($seen[spl_object_id($model)])) {
+                throw new \LogicException(static::class . '::insertMany() was given one model twice; give each once.');
+            }
+            $seen[spl_object_id($model)] = true;
+        }
+        // Rows inserted together have the same columns: a null left to the database is a column left out.
+        $prepared = $groups = [];
+        foreach ($models as $index => $model) {
+            $prepared[$index] = $model->insertion($map, $key, $map->values($model));
+            $groups[implode(',', array_keys($prepared[$index][0]))][] = $index;
+        }
+        $connection = Tide::database($map->database)->current();
+        $count = 0;
+        foreach ($groups as $indexes) {
+            foreach (array_chunk($indexes, 500) as $part) {
+                $rows = array_map(static fn(int $index): array => $prepared[$index][0], $part);
+                $count += $connection->table($map->table)->insertMany($rows);
+            }
+        }
+        foreach ($models as $index => $model) {
+            [, $givenKey, $stamps, $before] = $prepared[$index];
+            if ($givenKey) {
+                $model->inserted($map, $key, $connection, true, $stamps, $before, null);
+            }
+        }
+        return $count;
+    }
+
+    /**
+     * What an insert of this model writes, and what Tide fills in for it.
+     *
+     * @param array<string, mixed> $values The model's initialised columns, by property.
+     * @return array{array<string, mixed>, bool, array<string, mixed>, array<string, bool>}
+     *     The columns to write, whether the key was given, the times Tide keeps, and whether each was set before.
+     */
+    private function insertion(ModelMap $map, Field $key, array $values): array
+    {
+        // Zero is what an int property holds before the database numbers the row; MySQL takes it as a request for a number too.
+        if (($values[$key->property] ?? null) === 0) {
+            unset($values[$key->property]);
+        }
+        $givenKey = array_key_exists($key->property, $values);
+        if (!$givenKey && $key->type === 'string') {
+            throw new \LogicException(
+                static::class . "::\${$key->property} is a string key; give it a value before save().",
+            );
+        }
+        // The times #[Timestamps] keeps, where the application gave none.
+        $stamps = $before = [];
+        foreach (array_filter([$map->createdAt, $map->updatedAt]) as $stamp) {
+            if (($values[$stamp->property] ?? null) !== null) {
+                continue;
+            }
+            $before[$stamp->property] = array_key_exists($stamp->property, $values);
+            $stamps[$stamp->property] = $values[$stamp->property] = Tide::now();
+        }
+        $written = [];
+        foreach ($values as $name => $value) {
+            // Null is left to the database: its default for the column, or null.
+            if ($value === null) {
+                continue;
+            }
+            $field = $map->fields[$name];
+            $written[$field->column] = $field->toColumn($value);
+        }
+        if ($written === []) {
+            throw new \LogicException(static::class
+            . '::save() has no value to write; give at least one column a value before saving.');
+        }
+        return [$written, $givenKey, $stamps, $before];
+    }
+
+    /**
+     * The model after its row was inserted: its times and key filled in, stored, and
+     * made new again if the transaction is rolled back.
+     *
+     * @param array<string, mixed> $stamps
+     * @param array<string, bool> $before
+     */
+    private function inserted(
+        ModelMap $map,
+        Field $key,
+        Connection $connection,
+        bool $givenKey,
+        array $stamps,
+        array $before,
+        int|string|null $id,
+    ): void {
+        // Undone, the key the database gave and the times Tide wrote are forgotten too.
+        $forget = $givenKey ? [] : [$key->property => false];
+        $this->undoneBy($map, $connection, null, [...$forget, ...$before]);
+        foreach ($stamps as $name => $value) {
+            $map->assign($this, $name, $value);
+        }
+        if (!$givenKey) {
+            $map->assign($this, $key->property, $key->fromColumn($id));
+        }
+        $stored = [];
+        foreach ($map->values($this) as $name => $value) {
+            $stored[$name] = $map->snapshot($map->fields[$name], $value);
+        }
+        $this->storedValues = $stored;
     }
 
     public function delete(): void

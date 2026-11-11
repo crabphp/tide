@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- `Model::insertMany()` inserts new models of one class together and returns how many rows it inserted; models whose key was given are stored afterwards.
 - An empty alternative, `orWhere([])` or a group that adds nothing, after a real filter on a `related()` query is left out instead of reaching every child.
 - A model says how its dates are written in JSON by overriding `serializeDate()`; ISO 8601 with the offset unless it does.
 - `whereRaw()` and `orWhereRaw()` on a model query, with bindings, for a condition it has no method for; `tap()` inside a condition closure is refused and points to them.
