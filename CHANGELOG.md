@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.1.0 — 2026-11-12
+
+The first release, for `crabphp/framework` ^0.7.
+
 - `Model::saveMany()` saves several models of one class, new or stored, in one transaction, and returns them with their keys and times.
 - `Model::insertMany()` inserts new models of one class together and returns how many rows it inserted; models whose key was given are stored afterwards.
 - An empty alternative, `orWhere([])` or a group that adds nothing, after a real filter on a `related()` query is left out instead of reaching every child.

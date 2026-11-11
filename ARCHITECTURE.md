@@ -1,6 +1,6 @@
 # Tide architecture
 
-Status: **implemented, unreleased, 2026-11-11.** The framework's own design is in [../framework/ARCHITECTURE.md](../framework/ARCHITECTURE.md), and this document follows its goals, layers and scopes.
+Status: **released as 0.1.0, 2026-11-12.** The framework's own design is in [../framework/ARCHITECTURE.md](../framework/ARCHITECTURE.md), and this document follows its goals, layers and scopes.
 
 ## What it is
 
@@ -269,7 +269,7 @@ The suite covers mapping, persistence, query forwarding, relations, transactions
 3. Relations: `with()`, `load()`, `related()`, `whereHas()`.
 4. The measurement. A decision to go on.
 5. Writing: `save()`, `delete()`, `refresh()`.
-6. The package README, executable examples and contributor guide. The framework guide remains independent of this unreleased package; the sample and skeleton are unchanged.
+6. The package README, executable examples and contributor guide. The framework guide remains independent of the package; its guide is published beside the framework's on the website.
 
 ## Not planned
 
@@ -288,4 +288,4 @@ The suite covers mapping, persistence, query forwarding, relations, transactions
 - The database's own statements still borrow from its pool. `current()` exposes the current loan without changing existing callers.
 - Names are assumed from the classes and times are kept, both since 2026-11-11, by the owner's decision; attributes say the exceptions.
 - Relations are writable properties with no defaults. Readonly relation properties are refused because loading again and unloading after a changed foreign key must work.
-- The framework's no-ORM scope stays unchanged; Tide is an optional, unreleased package. No sample or skeleton changes belong to this work.
+- The framework's no-ORM scope stays unchanged; Tide is an optional package. The sample application runs on it.
