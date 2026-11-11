@@ -8,11 +8,13 @@ namespace Crab\Tide;
 final readonly class Table
 {
     public function __construct(
-        public string $name,
+        public ?string $name = null,
         public string $key = 'id',
         public ?string $database = null,
     ) {
-        Table::identifier($name, self::class . '::$name');
+        if ($name !== null) {
+            Table::identifier($name, self::class . '::$name');
+        }
         Table::identifier($key, self::class . '::$key');
     }
 

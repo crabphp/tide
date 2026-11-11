@@ -5,18 +5,12 @@ declare(strict_types=1);
 namespace Crab\Tide;
 
 /**
- * Has Tide keep a model's times: when it is first saved and when it is
- * last changed. Written on the model, so that a reader sees it:
+ * Says which times Tide keeps for a model. Without it, a model keeps the
+ * times it declares, created_at when it is first saved and updated_at at
+ * each change. Write it to name other columns, or null to keep one by hand:
  *
- *     #[Table('books'), Timestamps]
- *     final class Book extends Model
- *     {
- *         public ?\DateTimeImmutable $created_at = null;
- *         public ?\DateTimeImmutable $updated_at = null;
- *     }
- *
- * Give another column's name, or null for a time the table does not have:
- * #[Timestamps(updated: null)].
+ *     #[Timestamps(updated: 'modified_at')]
+ *     #[Timestamps(created: null, updated: null)]
  */
 #[\Attribute(\Attribute::TARGET_CLASS)]
 final readonly class Timestamps

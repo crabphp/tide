@@ -9,12 +9,14 @@ final readonly class BelongsToMany
 {
     public function __construct(
         public string $related,
-        public string $pivot,
-        public string $key,
-        public string $relatedKey,
+        public ?string $pivot = null,
+        public ?string $key = null,
+        public ?string $relatedKey = null,
     ) {
-        Table::identifier($pivot, self::class . '::$pivot');
-        Table::identifier($key, self::class . '::$key');
-        Table::identifier($relatedKey, self::class . '::$relatedKey');
+        foreach (['pivot' => $pivot, 'key' => $key, 'relatedKey' => $relatedKey] as $name => $value) {
+            if ($value !== null) {
+                Table::identifier($value, self::class . '::$' . $name);
+            }
+        }
     }
 }

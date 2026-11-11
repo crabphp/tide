@@ -52,7 +52,6 @@ final class ModelMapTest extends DatabaseTestCase
             [\stdClass::class, 'extending Crab\\Tide\\Model'],
             ['MissingTideClass', 'extending Crab\\Tide\\Model'],
             [AbstractModel::class, 'query a concrete model'],
-            [WithoutTable::class, "declare #[Table('table_name')]"],
             [UntypedModel::class, 'has no type; declare one'],
             [UnionModel::class, 'give it one type, or a cast'],
             [ReadonlyFieldModel::class, 'declare a writable public property'],

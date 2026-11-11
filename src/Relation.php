@@ -21,8 +21,14 @@ final readonly class Relation
         public BelongsTo|HasOne|HasMany|BelongsToMany $attribute,
     ) {}
 
-    public static function of(\ReflectionProperty $property, BelongsTo|HasOne|HasMany|BelongsToMany $attribute): self
-    {
+    /**
+     * @param class-string<Model> $owner The model the relation is read for, whose name gives the keys left unsaid.
+     */
+    public static function of(
+        \ReflectionProperty $property,
+        BelongsTo|HasOne|HasMany|BelongsToMany $attribute,
+        string $owner,
+    ): self {
         $name = $property->getName();
         $where = $property->getDeclaringClass()->getName() . '::$' . $name;
         if ($property->isPromoted() || $property->hasDefaultValue()) {
@@ -66,6 +72,28 @@ final readonly class Relation
                 "{$where} names {$related}, which is not a model; name a class extending " . Model::class . '.',
             );
         }
+        // What the attribute leaves out is named after the models, so the rest reads one complete declaration.
+        $attribute = match (true) {
+            $attribute instanceof BelongsTo => new BelongsTo(
+                $attribute->foreignKey ?? $name . '_id',
+                $attribute->ownerKey,
+            ),
+            $attribute instanceof HasOne => new HasOne(
+                $attribute->foreignKey ?? Names::key($owner),
+                $attribute->localKey,
+            ),
+            $attribute instanceof HasMany => new HasMany(
+                $related,
+                $attribute->foreignKey ?? Names::key($owner),
+                $attribute->localKey,
+            ),
+            default => new BelongsToMany(
+                $related,
+                $attribute->pivot ?? Names::pivot($owner, $related),
+                $attribute->key ?? Names::key($owner),
+                $attribute->relatedKey ?? Names::key($related),
+            ),
+        };
         return new self($name, $where, $related, $type->allowsNull(), $attribute);
     }
 
@@ -105,7 +133,7 @@ final readonly class Relation
         $field = $map->columns[$column] ?? null;
         if ($field === null || !in_array($field->type, [Field::INT, Field::STRING], true)) {
             throw new \LogicException(
-                "{$this->where} needs the column \"{$column}\" on {$map->class}; declare it as an int or string property, using #[ColumnName] when its name differs.",
+                "{$this->where} needs the column \"{$column}\" on {$map->class}; declare it as an int or string property, or name the relation's real key in its attribute.",
             );
         }
         return $field;

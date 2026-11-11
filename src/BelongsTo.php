@@ -8,10 +8,12 @@ namespace Crab\Tide;
 final readonly class BelongsTo
 {
     public function __construct(
-        public string $foreignKey,
+        public ?string $foreignKey = null,
         public ?string $ownerKey = null,
     ) {
-        Table::identifier($foreignKey, self::class . '::$foreignKey');
+        if ($foreignKey !== null) {
+            Table::identifier($foreignKey, self::class . '::$foreignKey');
+        }
         if ($ownerKey !== null) {
             Table::identifier($ownerKey, self::class . '::$ownerKey');
         }

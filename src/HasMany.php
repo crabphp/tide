@@ -9,10 +9,12 @@ final readonly class HasMany
 {
     public function __construct(
         public string $related,
-        public string $foreignKey,
+        public ?string $foreignKey = null,
         public ?string $localKey = null,
     ) {
-        Table::identifier($foreignKey, self::class . '::$foreignKey');
+        if ($foreignKey !== null) {
+            Table::identifier($foreignKey, self::class . '::$foreignKey');
+        }
         if ($localKey !== null) {
             Table::identifier($localKey, self::class . '::$localKey');
         }

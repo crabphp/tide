@@ -188,13 +188,12 @@ final class ModelMap
         }
         $reflection = new \ReflectionClass($class);
         if ($reflection->isAbstract()) {
-            throw new \LogicException("{$class} is abstract; query a concrete model with its own #[Table].");
+            throw new \LogicException("{$class} is abstract; query a concrete model that extends it.");
         }
+        // Without #[Table] the table is named after the class: OrderItem reads order_items.
         $attributes = $reflection->getAttributes(Table::class);
-        if ($attributes === []) {
-            throw new \LogicException("{$class} has no table; declare #[Table('table_name')] on the model itself.");
-        }
-        $table = $attributes[0]->newInstance();
+        $table = $attributes === [] ? new Table() : $attributes[0]->newInstance();
+        $tableName = $table->name ?? Names::table($class);
         $fields = $columns = $relations = $hidden = $setters = $readers = [];
         $properties = [];
         foreach (self::properties($reflection) as $name => $property) {
@@ -230,7 +229,15 @@ final class ModelMap
                     );
                 }
                 $attribute = array_values($relationAttributes)[0]->newInstance();
-                $relations[$name] = Relation::of($property, $attribute);
+                $relations[$name] = Relation::of($property, $attribute, $class);
+                continue;
+            }
+            if (
+                self::isModel($property)
+                && $property->getAttributes(Cast::class, \ReflectionAttribute::IS_INSTANCEOF) === []
+            ) {
+                // A property that is another model belongs to it, by the column named after the property.
+                $relations[$name] = Relation::of($property, new BelongsTo(), $class);
                 continue;
             }
             if ($property->isReadOnly() || $reflection->isReadOnly()) {
@@ -274,7 +281,7 @@ final class ModelMap
         }
         $map = new self(
             $class,
-            $table->name,
+            $tableName,
             $table->database,
             $key,
             $fields,
@@ -305,7 +312,9 @@ final class ModelMap
             $attributes = $declared->getAttributes(Timestamps::class);
         }
         if ($attributes === []) {
-            return null;
+            // Unsaid, a model keeps the times it declares: created_at and updated_at, as dates.
+            $field = $columns[$which . '_at'] ?? null;
+            return $field !== null && $field->type === Field::DATE ? $field : null;
         }
         $column = $attributes[0]->newInstance()->{$which};
         if ($column === null) {
@@ -318,6 +327,23 @@ final class ModelMap
             );
         }
         return $field;
+    }
+
+    /**
+     * Whether a property's type is another model, which makes it a relation.
+     */
+    private static function isModel(\ReflectionProperty $property): bool
+    {
+        $type = $property->getType();
+        if (!$type instanceof \ReflectionNamedType || $type->isBuiltin() && $type->getName() !== 'self') {
+            return false;
+        }
+        $name = match ($type->getName()) {
+            'self', 'static' => $property->getDeclaringClass()->getName(),
+            'parent' => (string) $property->getDeclaringClass()->getParentClass()?->getName(),
+            default => $type->getName(),
+        };
+        return is_subclass_of($name, Model::class);
     }
 
     /**

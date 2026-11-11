@@ -221,7 +221,8 @@ final class TimestampsTest extends DatabaseTestCase
     }
 }
 
-#[Table('tide_stamped'), Timestamps]
+// No #[Timestamps]: a model keeps the times it declares.
+#[Table('tide_stamped')]
 final class Stamped extends Model
 {
     public int $id;
@@ -257,7 +258,7 @@ final class StampedChild extends StampedParent
     public string $name;
 }
 
-#[Table('tide_stamped')]
+#[Table('tide_stamped'), Timestamps(created: null, updated: null)]
 final class Defaults extends Model
 {
     public int $id;
