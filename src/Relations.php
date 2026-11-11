@@ -83,6 +83,15 @@ final class Relations
             $query->prepareRelation($relation);
             // Validate nested names even when this particular relation has no rows.
             self::validate($related, $node['nested']);
+            // A partial selection still reads the keys rows are matched by, here and for the nested relations.
+            $query->prepareRead();
+            if (!$relation->attribute instanceof BelongsToMany) {
+                $query->need($foreign->column);
+            }
+            foreach (array_keys($node['nested']) as $nested) {
+                [, $nestedLocal] = $related->relation($nested)->keys($related);
+                $query->need($nestedLocal->column);
+            }
             $keys = [];
             $parentKeys = [];
             foreach ($models as $index => $model) {
@@ -121,8 +130,8 @@ final class Relations
                     }
                     $identity = $related->key === null ? null : $related->key->fromColumn($row[$related->key->column]);
                     $model = $identity === null
-                        ? $related->hydrate($row)
-                        : ($objects[$identity] ??= $related->hydrate($row));
+                        ? $query->hydrate($row)
+                        : ($objects[$identity] ??= $query->hydrate($row));
                     $groups[$group][] = $model;
                     if ($identity === null) {
                         $objects[] = $model;

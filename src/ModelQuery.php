@@ -12,7 +12,9 @@ use Crab\Contracts\Database\Page;
 use Crab\Contracts\Database\Query;
 
 /**
- * A whole-row query whose connection is fixed when the query is made.
+ * A query of models whose connection is fixed when the query is made. It reads
+ * every column the model declares, or those select() and except() choose, with
+ * the key and the keys its relations need always among them.
  *
  * @template T of Model
  */
@@ -31,6 +33,14 @@ final class ModelQuery
     private bool $qualified = false;
     private bool $filtered = false;
     private bool $windowed = false;
+    /**
+     * @var array<string, true>|null The model columns chosen by select() or except(), or null for every one.
+     */
+    private ?array $selected = null;
+    /**
+     * @var array<string, true> The model columns the query is ordered by, which a cursor is made of.
+     */
+    private array $orderColumns = [];
     public readonly string $qualifier;
 
     /**
@@ -77,6 +87,90 @@ final class ModelQuery
         $this->assertCurrent();
         $callback($this->query);
         return $this;
+    }
+
+    /**
+     * Reads only these columns. The others are left uninitialised on each model:
+     * reading one fails, JSON leaves it out and save() never writes it. The key, a
+     * column with a hook and a default, and the keys the query's relations and
+     * cursor need are read as well.
+     */
+    public function select(string ...$columns): static
+    {
+        if ($columns === []) {
+            throw new \LogicException(
+                "{$this->map->class} select() needs at least one column; leave select() out to read every column.",
+            );
+        }
+        $chosen = [];
+        foreach ($columns as $column) {
+            $chosen[$this->chosen($column, 'select')] = true;
+        }
+        $this->selected = $chosen;
+        $this->applySelection();
+        return $this;
+    }
+
+    /**
+     * Reads every column the model declares except these, as select() with the rest.
+     */
+    public function except(string ...$columns): static
+    {
+        if ($columns === []) {
+            throw new \LogicException(
+                "{$this->map->class} except() needs at least one column; leave except() out to read every column.",
+            );
+        }
+        $chosen = array_fill_keys(array_keys($this->map->columns), true);
+        foreach ($columns as $column) {
+            unset($chosen[$this->chosen($column, 'except')]);
+        }
+        $this->selected = $chosen;
+        $this->applySelection();
+        return $this;
+    }
+
+    /**
+     * @internal Makes a relation loader's or a cursor's column part of a partial selection.
+     */
+    public function need(string $column): void
+    {
+        if ($this->selected === null || isset($this->selected[$column]) || !isset($this->map->columns[$column])) {
+            return;
+        }
+        $this->selected[$column] = true;
+        $this->query->addSelect($this->qualifier . '.' . $column);
+    }
+
+    /**
+     * @internal Adds what reading needs to a partial selection: the local keys of the relations to load.
+     */
+    public function prepareRead(): void
+    {
+        if ($this->selected === null) {
+            return;
+        }
+        foreach (array_keys($this->relations) as $name) {
+            [, $local] = $this->map->relation($name)->keys($this->map);
+            $this->need($local->column);
+        }
+    }
+
+    /**
+     * @internal One row as a model, with only the selected columns when the query chose some.
+     *
+     * @param array<string, mixed> $row
+     */
+    public function hydrate(array $row): Model
+    {
+        if ($this->selected === null) {
+            return $this->map->hydrate($row);
+        }
+        $only = [];
+        foreach ($this->selected as $column => $_) {
+            $only[$this->map->columns[$column]->property] = true;
+        }
+        return $this->map->hydrate($row, $only);
     }
 
     public function with(string|\Closure ...$relations): static
@@ -146,6 +240,7 @@ final class ModelQuery
     public function get(): array
     {
         $this->assertCurrent();
+        $this->prepareRead();
         return $this->models($this->query->get());
     }
 
@@ -155,6 +250,7 @@ final class ModelQuery
     public function first(): ?Model
     {
         $this->assertCurrent();
+        $this->prepareRead();
         $row = $this->query->first();
         return $row === null ? null : $this->models([$row])[0];
     }
@@ -165,6 +261,7 @@ final class ModelQuery
     public function find(int|string $id): ?Model
     {
         $this->assertCurrent();
+        $this->prepareRead();
         $key = $this->map->requireKey();
         $row = $this->query->find($id, $this->qualifier . '.' . $key->column);
         return $row === null ? null : $this->models([$row])[0];
@@ -173,6 +270,7 @@ final class ModelQuery
     public function paginate(int $perPage = 15, int $page = 1): Page
     {
         $this->assertCurrent();
+        $this->prepareRead();
         $result = $this->query->paginate($perPage, $page);
         return new Page(
             $this->models($result->items),
@@ -186,6 +284,7 @@ final class ModelQuery
     public function simplePaginate(int $perPage = 15, int $page = 1): Page
     {
         $this->assertCurrent();
+        $this->prepareRead();
         $result = $this->query->simplePaginate($perPage, $page);
         return new Page(
             $this->models($result->items),
@@ -199,7 +298,13 @@ final class ModelQuery
     public function cursorPaginate(int $perPage = 15, ?string $cursor = null, ?string $unique = null): CursorPage
     {
         $this->assertCurrent();
-        $result = $this->query->cursorPaginate($perPage, $cursor, $unique ?? $this->map->requireKey()->column);
+        $this->prepareRead();
+        $unique ??= $this->map->requireKey()->column;
+        // A cursor is made of the columns the page is ordered by, so a partial selection reads them.
+        foreach ([...array_keys($this->orderColumns), $unique] as $column) {
+            $this->need($column);
+        }
+        $result = $this->query->cursorPaginate($perPage, $cursor, $unique);
         return new CursorPage($this->models($result->items), $result->perPage, $result->nextCursor);
     }
 
@@ -209,6 +314,8 @@ final class ModelQuery
         if (func_num_args() < 3) {
             $column = $this->map->requireKey()->column;
         }
+        $this->prepareRead();
+        $this->need($column);
         $this->query->chunkById(
             $size,
             fn(array $rows): mixed => $callback($this->models($rows)),
@@ -228,7 +335,7 @@ final class ModelQuery
      */
     private function models(array $rows): array
     {
-        $models = array_map($this->map->hydrate(...), $rows);
+        $models = array_map($this->hydrate(...), $rows);
         $this->loadRelations($models);
         return $models;
     }
@@ -355,6 +462,7 @@ final class ModelQuery
     public function orderBy(string $column, string $direction = 'asc'): static
     {
         $this->ordered = true;
+        $this->ordering($column);
         $this->query->orderBy($this->named($column), $direction);
         return $this;
     }
@@ -362,6 +470,7 @@ final class ModelQuery
     public function orderByDesc(string $column): static
     {
         $this->ordered = true;
+        $this->ordering($column);
         $this->query->orderByDesc($this->named($column));
         return $this;
     }
@@ -369,6 +478,7 @@ final class ModelQuery
     public function latest(string $column = 'created_at'): static
     {
         $this->ordered = true;
+        $this->ordering($column);
         $this->query->latest($this->named($column));
         return $this;
     }
@@ -376,6 +486,7 @@ final class ModelQuery
     public function oldest(string $column = 'created_at'): static
     {
         $this->ordered = true;
+        $this->ordering($column);
         $this->query->oldest($this->named($column));
         return $this;
     }
@@ -617,6 +728,59 @@ final class ModelQuery
             throw new \LogicException(
                 "{$this->map->class} has a relation condition reaching its own table; read the keys first and write with whereIn() instead of a bulk write with whereHas() or whereDoesntHave().",
             );
+        }
+    }
+
+    /**
+     * A column named to select() or except(), plainly or with the model's table.
+     */
+    private function chosen(string $column, string $method): string
+    {
+        $plain = str_starts_with($column, $this->qualifier . '.')
+            ? substr($column, strlen($this->qualifier) + 1)
+            : $column;
+        if (!isset($this->map->columns[$plain])) {
+            throw new \LogicException(
+                "{$this->map->class} {$method}() names \"{$column}\", which is not one of its columns; name "
+                . implode(', ', array_keys($this->map->columns))
+                . ', or use a record for a column the model does not declare.',
+            );
+        }
+        return $plain;
+    }
+
+    /**
+     * The builder reads the chosen columns, in the model's order, with those every query must read.
+     */
+    private function applySelection(): void
+    {
+        foreach ($this->map->fields as $name => $field) {
+            if (!$this->map->mustRead($name)) {
+                continue;
+            }
+            // A hooked property keeps its default when left out, which would look like the row's value.
+            $this->selected[$field->column] = true;
+        }
+        if ($this->map->key !== null) {
+            $this->selected[$this->map->key->column] = true;
+        }
+        $columns = array_values(array_filter(
+            array_keys($this->map->columns),
+            fn(string $column): bool => isset($this->selected[$column]),
+        ));
+        $this->query->select(...array_map(fn(string $column): string => $this->qualifier . '.' . $column, $columns));
+    }
+
+    /**
+     * Remembers a model column the query is ordered by, so a partial selection still reads it for a cursor.
+     */
+    private function ordering(string $column): void
+    {
+        $plain = str_starts_with($column, $this->qualifier . '.')
+            ? substr($column, strlen($this->qualifier) + 1)
+            : $column;
+        if (isset($this->map->columns[$plain])) {
+            $this->orderColumns[$plain] = true;
         }
     }
 

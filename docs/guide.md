@@ -88,7 +88,14 @@ public static function search(ProductSearch $search): ModelQuery
 $page = Product::search($search)->paginate($search->perPage, $search->page);
 ```
 
-A model is always a whole row. A report or a projection, counts, sums, a few columns of several tables, is the query builder's or an `into()` record's; the sample's daily report and category counts are.
+A list that needs only some columns says so, and gets models with the rest uninitialised:
+
+```php
+$page = Product::query()->select('name', 'price')->orderBy('name')->paginate(20);   // JSON: id, name, price
+$product = Product::query()->except('description')->find($id);
+```
+
+A report, counts, sums, columns of several tables, is the query builder's or an `into()` record's; the sample's daily report and category counts are.
 
 ## Relations
 

@@ -71,7 +71,7 @@ The package adds the third. Each has one job, described in the package README.
 | Record, `into()` | The typed shape of one query's result: a summary, a projection, a row of a report | A readonly object |
 | Model | A row the application reads, changes and saves, and its related rows | A model |
 
-A model is always a whole row. A query that reads some columns, or columns of several tables, is read into a record.
+A model's types describe its whole row; a query decides which of its columns it reads. One that reads columns of several tables, or expressions, is read into a record.
 
 ## Layers
 
@@ -149,10 +149,12 @@ A model keeps one thing of its own: the values it was read with, or null while i
 
 | Case | Rule |
 | --- | --- |
-| Choosing columns, joining | Not on a model query: a model is a whole row. Use a record |
+| Choosing columns | `select('title')` reads those, `except('body')` every other. The rest are uninitialised, never a default or null: reading one fails, JSON leaves it out, `save()` never writes it unless assigned, `refresh()` reads the whole row. Without either, every declared column is named, never `*` |
+| Columns always read | The key; the local keys of the query's relations and the foreign keys of a relation's own query; a cursor page's order columns; a column with a hook and a default, which PHP cannot leave uninitialised |
+| Joining, expressions | Not on a model query. Use a record |
 | Grouped conditions | Closures given to `where()` and `orWhere()` receive `ModelQuery`, so ordinary and relation predicates compose. Grouping through the builder in `tap()` still receives the builder |
 | A condition on related rows | `whereHas('chapters', fn ($query) => ...)` and `whereDoesntHave()`, written as `EXISTS` |
-| Something not forwarded | `tap(fn (Query $query) => ...)` gives the builder's query. If it stops reading whole rows, reading fails and says which column is missing |
+| Something not forwarded | `tap(fn (Query $query) => ...)` gives the builder's query. If it stops reading a column the query chose, reading fails and says which column is missing |
 | `update([...])` and `delete()` on a query | One statement, straight to the database. Models already read are not changed |
 | A value in a condition or an update | Conditions pass values to the drivers: enums become backing values and dates become text. Every column of an update must be declared and is converted through its field; increment/decrement extras follow the same rule, and their target column must also be declared |
 | Cursor and chunk defaults | The declared key when the unique/cursor column is omitted; refused without a key. Chunking refuses an existing order |

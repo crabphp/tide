@@ -134,7 +134,7 @@ final class ModelQueryTest extends DatabaseTestCase
         self::assertSame(1, $branch->count());
         self::assertSame(4, $query->count());
         $this->expectException(\LogicException::class);
-        $this->expectExceptionMessage('a model is a whole row');
+        $this->expectExceptionMessage('name it in select()');
         $query->tap(static fn(Query $query) => $query->select('id'))->first();
     }
 

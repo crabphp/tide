@@ -81,7 +81,7 @@ final class ModelMap
         );
         $missing = [];
         foreach ($fields as $name => $field) {
-            $missing[$name] = "{$class}::\${$name} reads the column \"{$field->column}\", which the query did not read; a model is a whole row. Select every model column, or use a record for a projection.";
+            $missing[$name] = "{$class}::\${$name} reads the column \"{$field->column}\", which the query did not read; name it in select(), leave select() out to read every column, or use a record for a projection.";
         }
         $this->missing = $missing;
     }
@@ -113,12 +113,21 @@ final class ModelMap
 
     /**
      * @param array<string, mixed> $row
+     * @param array<string, true>|null $only The properties the query selected, or null for every one. The others
+     *     are left uninitialised, a default included, so that reading one fails and saving never writes it.
      */
-    public function hydrate(array $row): Model
+    public function hydrate(array $row, ?array $only = null): Model
     {
         $model = $this->reflection->newInstanceWithoutConstructor();
         $stored = [];
         foreach ($this->fields as $name => $field) {
+            if ($only !== null && !isset($only[$name])) {
+                if ($this->initialized($model, $name)) {
+                    // A default the class gives, not a value the row has.
+                    $this->forget($model, $name);
+                }
+                continue;
+            }
             if (!array_key_exists($field->column, $row)) {
                 throw new \LogicException($this->missing[$name]);
             }
@@ -181,6 +190,15 @@ final class ModelMap
             $values[$name] = $this->value($model, $name);
         }
         return $values;
+    }
+
+    /**
+     * Whether a property must be read by every query: one with a hook and a default cannot be left
+     * uninitialised, so leaving its column out would leave the default looking like the row's value.
+     */
+    public function mustRead(string $name): bool
+    {
+        return $this->readers[$name]->hasHooks() && $this->readers[$name]->hasDefaultValue();
     }
 
     public function initialized(Model $model, string $name): bool

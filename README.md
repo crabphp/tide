@@ -1,6 +1,6 @@
 # Tide
 
-Tide adds typed models and explicit relations to the [Crab framework](https://github.com/crabphp/framework). New to it? Start with the [guide by use case](docs/guide.md); this README is the reference. Use a model for a whole row you read, change and save. Use the framework's query builder for arrays, and `into()` records for projections and reports.
+Tide adds typed models and explicit relations to the [Crab framework](https://github.com/crabphp/framework). New to it? Start with the [guide by use case](docs/guide.md); this README is the reference. Use a model for a row you read, change and save, whole or some of its columns. Use the framework's query builder for arrays, and `into()` records for joins and reports.
 
 Tide requires PHP 8.4 and `crabphp/framework` 0.7 or later. Install it with Composer:
 
@@ -92,6 +92,16 @@ $book = Book::find(1);
 $page = Book::query()->orderBy('id')->paginate(20);
 $names = Author::query()->orderBy('id')->pluck('name');
 ```
+
+A query reads every column the model declares, named one by one, never `*`. `select()` reads only the columns it names, and `except()` every one but those:
+
+```php
+// select.php
+$titles = Book::query()->select('title')->orderBy('id')->get();
+$light = Book::query()->except('internal_note')->find(1);
+```
+
+The other columns are left uninitialised: reading one is PHP's error, never a default or a null that looks like the row's value. JSON leaves them out, `save()` writes only what changed, an unread column you assign is written, and `refresh()` reads the whole row. The key is always read, and so are the keys the query's relations are matched by and the columns a cursor page is ordered by. A column with a hook and a default is always read too, since PHP cannot leave it uninitialised. A column the model does not declare, a join or an expression is a record's.
 
 `simplePaginate()`, `cursorPaginate()` and `chunkById()` also return models. Cursor pagination and chunking default to the declared key and require one when their column is omitted. `chunkById()` reads in ascending order of that column and refuses an existing order; remove `orderBy()` before calling it. Aggregates, `value()` and `pluck()` return plain database values. Query execution leaves the query unchanged; clone it to branch. `when()` receives the model query. `tap()` receives the framework's `Query` for operations not forwarded; a partial selection fails when it cannot make a whole model row.
 

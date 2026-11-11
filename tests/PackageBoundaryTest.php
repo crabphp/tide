@@ -32,14 +32,16 @@ final class PackageBoundaryTest extends TestCase
         self::assertSame([], $violations);
     }
 
-    public function testTheModelOwnsOnlyItsPrivateSnapshotAndTheQueryDoesNotOfferProjections(): void
+    public function testTheModelOwnsOnlyItsPrivateSnapshotAndTheQueryChoosesOnlyItsOwnColumns(): void
     {
         $model = new \ReflectionClass(Model::class);
         self::assertNull($model->getConstructor());
         self::assertCount(1, $model->getProperties());
         self::assertTrue($model->getProperty('storedValues')->isPrivate());
+        // A model query may read some of its own columns; it never reads another shape.
+        self::assertTrue(method_exists(ModelQuery::class, 'select'));
+        self::assertTrue(method_exists(ModelQuery::class, 'except'));
         foreach ([
-            'select',
             'addSelect',
             'selectRaw',
             'selectSub',

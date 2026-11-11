@@ -105,7 +105,7 @@ final class ModelMapTest extends DatabaseTestCase
     public function testHydrationRequiresEveryColumnEvenWithADefault(): void
     {
         $this->expectException(\LogicException::class);
-        $this->expectExceptionMessage('a model is a whole row');
+        $this->expectExceptionMessage('name it in select()');
         ModelMap::of(DefaultColumnModel::class)->hydrate(['id' => 1]);
     }
 
