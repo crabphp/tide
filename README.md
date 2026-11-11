@@ -130,6 +130,50 @@ On a many-to-many relation, a condition or an order on a plain column name means
 
 A limit or offset in an eager constraint is refused; use `related()` for one model's limited query. A relation in another database reads that database's current connection, with a many-to-many pivot beside the related table. `whereHas()` and `whereDoesntHave()` cannot cross databases. `tap()` changes are not tracked for eager limit and order checks.
 
+### Polymorphic relations
+
+A row that belongs to one of several models, a comment on a post or on a video, has a type column and an id column. `#[MorphTo]` reads them, and its union type lists the models it may belong to:
+
+```php
+// morph.php
+use Crab\Tide\MorphMany;
+use Crab\Tide\MorphTo;
+
+final class Post extends Model
+{
+    public int $id;
+
+    #[MorphMany(Comment::class)]
+    public array $comments;
+
+    public function __construct(public string $title) {}
+}
+
+final class Comment extends Model
+{
+    public int $id;
+    public string $commentable_type;
+    public int $commentable_id;
+
+    #[MorphTo]
+    public Post|Book $commentable;
+
+    public function __construct(public string $body) {}
+}
+
+$post = new Post('Hello');
+$post->save();
+$comment = new Comment('First!');
+$comment->associate('commentable', $post)->save();   // commentable_type "posts", commentable_id the post's id
+
+$commented = Post::query()->with('comments')->get();
+$owners = Comment::query()->with('commentable')->get();
+```
+
+The type column holds each model's morph name: its table's name, `posts`, or `#[Table(morph: 'post')]`, so renaming a class never changes stored rows. The columns are named after the property, `commentable_type` and `commentable_id`, unless `#[MorphTo(type: ..., id: ...)]` names them. `#[MorphMany(Comment::class)]` and `#[MorphOne]` find the related model's `#[MorphTo]` that lists this model; `relation:` names it when there are several.
+
+`with()` and `load()` read a `MorphTo` with one query per model it belongs to; a nested path past it must be a relation of each. A type the union does not list is refused, naming it and the morph names it may be. `MorphMany` and `MorphOne` work with `with()`, `load()`, `related()`, `whereHas()` and `whereDoesntHave()`, each reading only the rows whose type names this model. `whereHas()` cannot follow a `MorphTo`; condition its columns. `associate('commentable', $post)` sets the type and id columns, `associate('author', $author)` a `BelongsTo`'s key, and null points at none; `save()` writes them. `Post::morphName()` gives the name stored for a model.
+
 ## Writing
 
 Make a model with `new`, then save it. Later saves write only changed columns:
@@ -210,6 +254,6 @@ JSON includes initialized columns and loaded relations in declaration order, wit
 
 A `#[Json]` array is compared as PHP compares arrays. An object placed inside one and changed in place is not seen as a change; assign the array again.
 
-Tide does not load on property access, maintain an identity map, validate input, soft-delete, fire model events or provide collections, polymorphic relations or composite keys. Models belong to one request; give a job an id and read the row in the job.
+Tide does not load on property access, maintain an identity map, validate input, soft-delete, fire model events or provide collections, many-to-many polymorphic relations or composite keys. Models belong to one request; give a job an id and read the row in the job.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for checks and [BENCHMARKS.md](BENCHMARKS.md) for measured reading costs.

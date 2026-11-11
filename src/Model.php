@@ -107,15 +107,96 @@ abstract class Model implements \JsonSerializable
         }
         $this->storedValues = array_replace($this->storedValues, $changed);
         foreach ($map->relations as $name => $relation) {
-            if (
-                !$relation->attribute instanceof BelongsTo
-                || !array_key_exists($relation->attribute->foreignKey, $written)
-            ) {
+            $columns = match (true) {
+                $relation->attribute instanceof BelongsTo => [$relation->attribute->foreignKey],
+                $relation->attribute instanceof MorphTo => [$relation->attribute->type, $relation->attribute->id],
+                default => [],
+            };
+            if (array_intersect_key($written, array_flip($columns)) === []) {
                 continue;
             }
+            // Loaded for what the row pointed to before, it would answer with the old row.
             unset($this->{$name});
         }
         return $this;
+    }
+
+    /**
+     * Points a BelongsTo or MorphTo at another model, or at none with null: its
+     * key column, and a MorphTo's type column, take the model's key and morph
+     * name, and the relation holds the model. save() writes the columns.
+     *
+     *     $comment->associate('commentable', $post)->save();
+     */
+    public function associate(string $relation, ?self $model): static
+    {
+        $map = ModelMap::of(static::class);
+        $declared = $map->relation($relation);
+        $attribute = $declared->attribute;
+        if (!$attribute instanceof BelongsTo && !$attribute instanceof MorphTo) {
+            throw new \LogicException(
+                "{$declared->where} is not a BelongsTo or a MorphTo; associate() points this model at its owner, so save the related model with this one's key instead.",
+            );
+        }
+        $columns = $attribute instanceof MorphTo ? [$attribute->type, $attribute->id] : [$attribute->foreignKey];
+        if ($model === null) {
+            foreach ($columns as $column) {
+                if (!$map->columns[$column]->nullable) {
+                    throw new \LogicException(
+                        "{$declared->where} cannot point at none: {$map->columns[$column]->property} is not nullable.",
+                    );
+                }
+            }
+            if (!$declared->nullable) {
+                throw new \LogicException("{$declared->where} cannot point at none; declare it nullable.");
+            }
+            foreach ($columns as $column) {
+                $map->assign($this, $map->columns[$column]->property, null);
+            }
+            $this->{$relation} = null;
+            return $this;
+        }
+        if ($attribute instanceof MorphTo) {
+            $target = $declared->morphTargets()[ModelMap::of($model::class)->morph] ?? null;
+            if ($target === null || $target->class !== $model::class) {
+                throw new \LogicException(
+                    "{$declared->where} cannot point at a "
+                    . $model::class
+                    . '; it belongs to one of '
+                    . implode(', ', $declared->targets)
+                    . '.',
+                );
+            }
+            $owner = $target->requireKey();
+            $map->assign($this, $map->columns[$attribute->type]->property, $target->morph);
+            $local = $map->columns[$attribute->id];
+        } else {
+            [$related, $local, $owner] = $declared->keys($map);
+            if ($model::class !== $related->class) {
+                throw new \LogicException(
+                    "{$declared->where} cannot point at a " . $model::class . "; it belongs to a {$related->class}.",
+                );
+            }
+            $target = $related;
+        }
+        if (!$model->stored() || !$target->initialized($model, $owner->property)) {
+            throw new \LogicException(
+                "{$declared->where} can point only at a stored "
+                . $model::class
+                . " with its {$owner->property}; save it first.",
+            );
+        }
+        $map->assign($this, $local->property, $target->value($model, $owner->property));
+        $this->{$relation} = $model;
+        return $this;
+    }
+
+    /**
+     * What a #[MorphTo] type column holds for this model: its table's name, or #[Table(morph: ...)].
+     */
+    public static function morphName(): string
+    {
+        return ModelMap::of(static::class)->morph;
     }
 
     /**

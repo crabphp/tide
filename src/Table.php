@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace Crab\Tide;
 
+/**
+ * A model's table, its key, its database, and its morph name: what a
+ * #[MorphTo] type column holds for it, the table's name unless said.
+ */
 #[\Attribute(\Attribute::TARGET_CLASS)]
 final readonly class Table
 {
@@ -11,9 +15,13 @@ final readonly class Table
         public ?string $name = null,
         public string $key = 'id',
         public ?string $database = null,
+        public ?string $morph = null,
     ) {
         if ($name !== null) {
             Table::identifier($name, self::class . '::$name');
+        }
+        if ($morph !== null) {
+            Table::identifier($morph, self::class . '::$morph');
         }
         Table::identifier($key, self::class . '::$key');
     }

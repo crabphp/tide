@@ -71,8 +71,17 @@ final class Relations
         $map = $parent->map;
         foreach ($tree as $name => $node) {
             $relation = $map->relation($name);
+            if ($relation->attribute instanceof MorphTo) {
+                self::loadMorphTo($parent, $models, $relation, $node);
+                continue;
+            }
             [$related, $local, $foreign] = $relation->keys($map);
             $query = self::relatedQuery($parent, $related);
+            $morph = $relation->morphType($map);
+            if ($morph !== null) {
+                // Only the rows whose type column names this model: a video's comment 7 is not post 7's.
+                $query->where($query->qualifier . '.' . $morph[0], $morph[1]);
+            }
             if ($relation->attribute instanceof BelongsToMany) {
                 // Said before the constraints are written, so that their columns are the related model's.
                 $query->joined();
@@ -89,8 +98,9 @@ final class Relations
                 $query->need($foreign->column);
             }
             foreach (array_keys($node['nested']) as $nested) {
-                [, $nestedLocal] = $related->relation($nested)->keys($related);
-                $query->need($nestedLocal->column);
+                foreach ($related->relation($nested)->localColumns($related) as $column) {
+                    $query->need($column);
+                }
             }
             $keys = [];
             $parentKeys = [];
@@ -104,7 +114,10 @@ final class Relations
             $groups = [];
             $objects = [];
             $manyToMany = $relation->attribute instanceof BelongsToMany;
-            $single = $relation->attribute instanceof HasOne || $relation->attribute instanceof BelongsTo;
+            $single =
+                $relation->attribute instanceof HasOne
+                || $relation->attribute instanceof BelongsTo
+                || $relation->attribute instanceof MorphOne;
             $pivotAlias = 'tide_pivot';
             while (isset($related->columns[$pivotAlias])) {
                 $pivotAlias .= '_';
@@ -142,7 +155,7 @@ final class Relations
             foreach ($models as $index => $model) {
                 $key = $parentKeys[$index];
                 $matches = $key === null ? [] : $groups[$key] ?? [];
-                if ($relation->attribute instanceof BelongsTo || $relation->attribute instanceof HasOne) {
+                if ($single) {
                     $value = $matches[0] ?? null;
                     if ($value === null && !$relation->nullable) {
                         throw new \UnexpectedValueException(
@@ -165,6 +178,71 @@ final class Relations
         }
     }
 
+    /**
+     * Loads a MorphTo: the models are grouped by their type column, and each
+     * model it may belong to is read with one query per batch of ids.
+     *
+     * @param list<Model> $models
+     * @param array{constraints: list<\Closure>, nested: array} $node
+     */
+    private static function loadMorphTo(ModelQuery $parent, array $models, Relation $relation, array $node): void
+    {
+        $map = $parent->map;
+        /** @var MorphTo $attribute */
+        $attribute = $relation->attribute;
+        $types = $map->columns[$attribute->type];
+        $ids = $map->columns[$attribute->id];
+        $wanted = [];
+        $pointers = [];
+        foreach ($models as $index => $model) {
+            $type = self::value($map, $model, $types->property, $relation);
+            $id = self::value($map, $model, $ids->property, $relation);
+            $pointers[$index] = $type === null || $id === null ? null : [(string) $type, $id];
+            if ($pointers[$index] !== null) {
+                $wanted[(string) $type][$id] = $id;
+            }
+        }
+        $found = [];
+        foreach ($wanted as $morph => $keys) {
+            $related = $relation->morphTarget($morph);
+            $key = $related->requireKey();
+            $query = self::relatedQuery($parent, $related);
+            foreach ($node['constraints'] as $constraint) {
+                $query->constrain($constraint);
+            }
+            $query->prepareRelation($relation);
+            self::validate($related, $node['nested']);
+            $query->prepareRead();
+            foreach (array_keys($node['nested']) as $nested) {
+                foreach ($related->relation($nested)->localColumns($related) as $column) {
+                    $query->need($column);
+                }
+            }
+            $objects = [];
+            foreach (array_chunk(array_values($keys), self::BATCH) as $part) {
+                $batch = clone $query;
+                $batch->whereIn($related->table . '.' . $key->column, $part);
+                foreach ($batch->builder()->get() as $row) {
+                    $identity = $key->fromColumn($row[$key->column]);
+                    $objects[$identity] ??= $query->hydrate($row);
+                }
+            }
+            $found[$morph] = $objects;
+            $query->loadRelations(array_values($objects));
+            self::load($query, array_values($objects), $node['nested']);
+        }
+        foreach ($models as $index => $model) {
+            $pointer = $pointers[$index];
+            $value = $pointer === null ? null : $found[$pointer[0]][$pointer[1]] ?? null;
+            if ($value === null && !$relation->nullable) {
+                throw new \UnexpectedValueException(
+                    "{$relation->where} has no related row; declare the relation nullable or store a matching related row.",
+                );
+            }
+            $model->{$relation->property} = $value;
+        }
+    }
+
     public static function query(ModelQuery $parent, Model $model, Relation $relation): ModelQuery
     {
         [$related, $local, $foreign] = $relation->keys($parent->map);
@@ -176,7 +254,8 @@ final class Relations
         } else {
             $match = $related->table . '.' . $foreign->column;
         }
-        $query->scope($match, $key);
+        $morph = $relation->morphType($parent->map);
+        $query->scope($match, $key, $morph === null ? [] : [$related->table . '.' . $morph[0] => $morph[1]]);
         return $query;
     }
 
@@ -189,6 +268,11 @@ final class Relations
     ): Query {
         [$name, $rest] = array_pad(explode('.', $path, 2), 2, null);
         $relation = $parent->map->relation($name);
+        if ($relation->attribute instanceof MorphTo) {
+            throw new \LogicException(
+                "{$relation->where} belongs to one of several models, so whereHas() and whereDoesntHave() cannot follow it; condition its type and id columns, or load it with with().",
+            );
+        }
         [$related, $local, $foreign] = $relation->keys($parent->map);
         if ($related->database !== $parent->map->database) {
             throw new \LogicException(
@@ -216,6 +300,10 @@ final class Relations
             $match = $query->qualifier . '.' . $foreign->column;
         }
         $query->whereColumn($match, '=', $parent->qualifier . '.' . $local->column);
+        $morph = $relation->morphType($parent->map);
+        if ($morph !== null) {
+            $query->where($query->qualifier . '.' . $morph[0], $morph[1]);
+        }
         if ($rest !== null) {
             $query->builder()->whereExists(self::exists($query, $rest, $constraint, $depth + 1, $ancestors));
         }
@@ -261,8 +349,15 @@ final class Relations
     {
         foreach ($tree as $name => $node) {
             $relation = $map->relation($name);
-            if ($node['nested'] !== []) {
-                self::validate(ModelMap::of($relation->related), $node['nested']);
+            if ($node['nested'] === []) {
+                continue;
+            }
+            // Past a MorphTo, a nested relation is read for every model it may belong to, so each must declare it.
+            $targets = $relation->attribute instanceof MorphTo
+                ? $relation->morphTargets()
+                : [ModelMap::of($relation->related)];
+            foreach ($targets as $target) {
+                self::validate($target, $node['nested']);
             }
         }
     }

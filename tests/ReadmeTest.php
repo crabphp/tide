@@ -21,6 +21,14 @@ final class ReadmeTest extends DatabaseTestCase
         $database->execute(
             "create table books (id {$id}, title varchar(100) not null, author_id integer null, internal_note varchar(100) not null default 'hidden', created_at datetime null, updated_at datetime null)",
         );
+        $database->execute('drop table if exists posts');
+        $database->execute('drop table if exists comments');
+        $database->execute('create table posts (id ' . $id . ', title varchar(100) not null)');
+        $database->execute(
+            'create table comments (id '
+            . $id
+            . ', commentable_type varchar(20) not null, commentable_id integer not null, body varchar(100) not null)',
+        );
         $database->table('authors')->insert(['id' => 1, 'name' => 'First']);
         $database->table('books')->insert(['id' => 1, 'title' => 'PHP', 'author_id' => 1]);
         $readme = file_get_contents(dirname(__DIR__) . '/README.md');
@@ -30,7 +38,7 @@ final class ReadmeTest extends DatabaseTestCase
             preg_match('/\A\/\/ ([a-z-]+\.php)\n/', $block, $name);
             $blocks[$name[1]] = $block;
         }
-        self::assertCount(11, $blocks, 'Every PHP block needs a runnable example name.');
+        self::assertCount(12, $blocks, 'Every PHP block needs a runnable example name.');
         // Separate namespaces allow the exact declarations to run on every driver.
         $namespace = 'TideReadme' . bin2hex(random_bytes(6));
         $directory = sys_get_temp_dir() . '/tide-readme-' . bin2hex(random_bytes(6));
@@ -43,12 +51,14 @@ final class ReadmeTest extends DatabaseTestCase
             $source =
                 "<?php\ndeclare(strict_types=1);\nnamespace {$namespace};\n"
                 . implode("\n", $blocks)
-                . "\nreturn [\$books, \$page, \$recent, \$json, \$copy, \$count, \$grace, \$titles, \$light];\n";
+                . "\nreturn [\$books, \$page, \$recent, \$json, \$copy, \$count, \$grace, \$titles, \$light, \$commented, \$owners];\n";
             file_put_contents($directory . '/examples.php', $source);
-            [$books, $page, $recent, $json, $copy, $count, $grace, $titles, $light] = require
+            [$books, $page, $recent, $json, $copy, $count, $grace, $titles, $light, $commented, $owners] = require
                 $directory . '/examples.php';
             self::assertSame('{"id":1,"title":"PHP"}', json_encode($titles[0], JSON_THROW_ON_ERROR));
             self::assertSame('PHP', $light->title);
+            self::assertSame('First!', $commented[0]->comments[0]->body);
+            self::assertSame('Hello', $owners[0]->commentable->title);
             self::assertCount(1, $books);
             self::assertCount(1, $page);
             self::assertCount(1, $recent);
@@ -69,6 +79,8 @@ final class ReadmeTest extends DatabaseTestCase
             rmdir($directory);
             $database->execute('drop table books');
             $database->execute('drop table authors');
+            $database->execute('drop table posts');
+            $database->execute('drop table comments');
         }
     }
 }

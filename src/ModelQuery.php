@@ -151,8 +151,9 @@ final class ModelQuery
             return;
         }
         foreach (array_keys($this->relations) as $name) {
-            [, $local] = $this->map->relation($name)->keys($this->map);
-            $this->need($local->column);
+            foreach ($this->map->relation($name)->localColumns($this->map) as $column) {
+                $this->need($column);
+            }
         }
     }
 
@@ -612,11 +613,18 @@ final class ModelQuery
     /**
      * @internal Keep the parent predicate in every top-level OR branch.
      */
-    public function scope(string $column, int|string|null $key): void
+    /**
+     * @param array<string, string> $also Further columns the parent condition fixes, as a morph's type column.
+     */
+    public function scope(string $column, int|string|null $key, array $also = []): void
     {
-        $this->scope = static fn(Query $query): Query => (
-            $key === null ? $query->whereIn($column, []) : $query->where($column, $key)
-        );
+        $this->scope = static function (Query $query) use ($column, $key, $also): Query {
+            $query = $key === null ? $query->whereIn($column, []) : $query->where($column, $key);
+            foreach ($also as $fixed => $value) {
+                $query = $query->where($fixed, $value);
+            }
+            return $query;
+        };
         ($this->scope)($this->query);
     }
 

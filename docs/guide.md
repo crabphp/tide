@@ -140,6 +140,26 @@ Account::query()->whereHas('orders', fn (ModelQuery $q) => $q->where('status', O
 
 Reading a relation that was not loaded is PHP's error for an uninitialised property, never a quiet query; `isset($order->lines)` says whether it is loaded. Each relation is one query, however many models there are.
 
+A review that may be of a product or of an order belongs to one of them, and its union type says which may be:
+
+```php
+final class Review extends Model
+{
+    public string $reviewable_type;           // 'products' or 'orders': the owner's table
+    public int $reviewable_id;
+
+    #[MorphTo] public Product|Order $reviewable;
+}
+
+final class Product extends Model
+{
+    #[MorphMany(Review::class)] public array $reviews;
+}
+
+$review->associate('reviewable', $product)->save();
+Review::query()->with('reviewable')->get();   // one query for the products, one for the orders
+```
+
 ## Writing
 
 ```php
@@ -215,4 +235,4 @@ For another shape, give the model a method; the sample's `Product::summary()` is
 - Events, observers and global scopes: what happens is written where it happens.
 - Soft deletes: a column of your own, and a condition on it.
 - A collection class: a list is a PHP array.
-- Polymorphic relations and keys of several columns.
+- Many-to-many polymorphic relations and keys of several columns.

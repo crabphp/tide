@@ -62,6 +62,7 @@ final class ModelMap
         array $readers,
         public readonly ?Field $createdAt = null,
         public readonly ?Field $updatedAt = null,
+        public readonly string $morph = '',
     ) {
         $this->reflection = new \ReflectionClass($class);
         $plain = true;
@@ -249,7 +250,15 @@ final class ModelMap
             }
             $relationAttributes = array_filter($property->getAttributes(), static fn(\ReflectionAttribute $attribute): bool => in_array(
                 $attribute->getName(),
-                [BelongsTo::class, HasOne::class, HasMany::class, BelongsToMany::class],
+                [
+                    BelongsTo::class,
+                    HasOne::class,
+                    HasMany::class,
+                    BelongsToMany::class,
+                    MorphTo::class,
+                    MorphOne::class,
+                    MorphMany::class,
+                ],
                 true,
             ));
             if ($property->isVirtual() && $relationAttributes === []) {
@@ -286,6 +295,11 @@ final class ModelMap
                 // A property that is another model belongs to it, by the column named after the property.
                 $relations[$name] = Relation::of($property, new BelongsTo(), $class);
                 continue;
+            }
+            if (self::isModels($property)) {
+                throw new \LogicException(
+                    "{$where} is a union of models; mark it #[MorphTo] to belong to one of them, with a type column and an id column.",
+                );
             }
             if ($property->isReadOnly() || $reflection->isReadOnly()) {
                 throw new \LogicException(
@@ -340,6 +354,7 @@ final class ModelMap
             $readers,
             self::stamp($reflection, $columns, 'created'),
             self::stamp($reflection, $columns, 'updated'),
+            $table->morph ?? $tableName,
         );
         foreach ($relations as $relation) {
             $relation->checkLocal($map);
@@ -391,6 +406,26 @@ final class ModelMap
             default => $type->getName(),
         };
         return is_subclass_of($name, Model::class);
+    }
+
+    /**
+     * Whether a property's type is a union of models, which only a MorphTo can be.
+     */
+    private static function isModels(\ReflectionProperty $property): bool
+    {
+        $type = $property->getType();
+        if (!$type instanceof \ReflectionUnionType) {
+            return false;
+        }
+        foreach ($type->getTypes() as $member) {
+            if (
+                !$member instanceof \ReflectionNamedType
+                || $member->getName() !== 'null' && !is_subclass_of($member->getName(), Model::class)
+            ) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**

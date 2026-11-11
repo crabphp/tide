@@ -13,12 +13,16 @@ use Crab\Contracts\Database\Field;
  */
 final readonly class Relation
 {
+    /**
+     * @param list<class-string<Model>> $targets The models a MorphTo may belong to, from its union type.
+     */
     private function __construct(
         public string $property,
         public string $where,
         public string $related,
         public bool $nullable,
-        public BelongsTo|HasOne|HasMany|BelongsToMany $attribute,
+        public BelongsTo|HasOne|HasMany|BelongsToMany|MorphTo|MorphOne|MorphMany $attribute,
+        public array $targets = [],
     ) {}
 
     /**
@@ -26,7 +30,7 @@ final readonly class Relation
      */
     public static function of(
         \ReflectionProperty $property,
-        BelongsTo|HasOne|HasMany|BelongsToMany $attribute,
+        BelongsTo|HasOne|HasMany|BelongsToMany|MorphTo|MorphOne|MorphMany $attribute,
         string $owner,
     ): self {
         $name = $property->getName();
@@ -45,7 +49,17 @@ final readonly class Relation
             );
         }
         $type = $property->getType();
-        $many = $attribute instanceof HasMany || $attribute instanceof BelongsToMany;
+        if ($attribute instanceof MorphTo) {
+            return new self(
+                $name,
+                $where,
+                '',
+                $type?->allowsNull() ?? false,
+                new MorphTo($attribute->type ?? $name . '_type', $attribute->id ?? $name . '_id'),
+                self::targets($type, $where),
+            );
+        }
+        $many = $attribute instanceof HasMany || $attribute instanceof BelongsToMany || $attribute instanceof MorphMany;
         $typeName = $type instanceof \ReflectionNamedType ? $type->getName() : '';
         $typeName = match ($typeName) {
             'self' => $property->getDeclaringClass()->getName(),
@@ -87,6 +101,8 @@ final readonly class Relation
                 $attribute->foreignKey ?? Names::key($owner),
                 $attribute->localKey,
             ),
+            // The related model's MorphTo is found when the relation is first used, once both models can be read.
+            $attribute instanceof MorphOne, $attribute instanceof MorphMany => $attribute,
             default => new BelongsToMany(
                 $related,
                 $attribute->pivot ?? Names::pivot($owner, $related),
@@ -102,6 +118,28 @@ final readonly class Relation
         if ($this->attribute instanceof BelongsTo) {
             $this->field($map, $this->attribute->foreignKey);
         }
+        if ($this->attribute instanceof MorphTo) {
+            $type = $map->columns[$this->attribute->type] ?? null;
+            if ($type === null || $type->type !== Field::STRING) {
+                throw new \LogicException(
+                    "{$this->where} needs the column \"{$this->attribute->type}\" on {$map->class} for the related model's morph name; declare it as a string property, or name the type column in #[MorphTo(type: ...)].",
+                );
+            }
+            $this->field($map, $this->attribute->id);
+        }
+    }
+
+    /**
+     * The columns of the model the relation is read for that its rows are matched by.
+     *
+     * @return list<string>
+     */
+    public function localColumns(ModelMap $map): array
+    {
+        if ($this->attribute instanceof MorphTo) {
+            return [$this->attribute->type, $this->attribute->id];
+        }
+        return [$this->keys($map)[1]->column];
     }
 
     /**
@@ -109,8 +147,13 @@ final readonly class Relation
      */
     public function keys(ModelMap $parent): array
     {
-        $related = ModelMap::of($this->related);
         $attribute = $this->attribute;
+        if ($attribute instanceof MorphTo) {
+            throw new \LogicException(
+                "{$this->where} belongs to one of several models; load it with with('{$this->property}') or Model::load().",
+            );
+        }
+        $related = ModelMap::of($this->related);
         if ($attribute instanceof BelongsTo) {
             return [
                 $related,
@@ -121,11 +164,142 @@ final readonly class Relation
         if ($attribute instanceof BelongsToMany) {
             return [$related, $parent->requireKey(), $related->requireKey()];
         }
+        if ($attribute instanceof MorphOne || $attribute instanceof MorphMany) {
+            return [
+                $related,
+                $attribute->localKey === null ? $parent->requireKey() : $this->field($parent, $attribute->localKey),
+                $this->field($related, $this->pair($parent, $related)->id),
+            ];
+        }
         return [
             $related,
             $attribute->localKey === null ? $parent->requireKey() : $this->field($parent, $attribute->localKey),
             $this->field($related, $attribute->foreignKey),
         ];
+    }
+
+    /**
+     * For a MorphOne or MorphMany, the related model's type column and the
+     * morph name it holds for the parent; null for any other relation.
+     *
+     * @return array{string, string}|null
+     */
+    public function morphType(ModelMap $parent): ?array
+    {
+        if (!$this->attribute instanceof MorphOne && !$this->attribute instanceof MorphMany) {
+            return null;
+        }
+        return [$this->pair($parent, ModelMap::of($this->related))->type, $parent->morph];
+    }
+
+    /**
+     * For a MorphTo, the models it may belong to by the morph name its type column holds for each.
+     *
+     * @return array<string, ModelMap>
+     */
+    public function morphTargets(): array
+    {
+        $maps = [];
+        foreach ($this->targets as $class) {
+            $map = ModelMap::of($class);
+            $map->requireKey();
+            if (isset($maps[$map->morph])) {
+                throw new \LogicException(
+                    "{$this->where} lists {$maps[$map->morph]->class} and {$class}, which share the morph name \"{$map->morph}\"; give one another with #[Table(morph: '...')].",
+                );
+            }
+            $maps[$map->morph] = $map;
+        }
+        return $maps;
+    }
+
+    /**
+     * The model of one morph name a MorphTo's type column holds.
+     */
+    public function morphTarget(string $morph): ModelMap
+    {
+        return $this->morphTargets()[$morph] ?? throw new \UnexpectedValueException(
+            "{$this->where} has the type \"{$morph}\", which is none of its models' morph names ("
+            . implode(', ', array_keys($this->morphTargets()))
+            . '); add its model to the union type, or correct the row.',
+        );
+    }
+
+    /**
+     * The related model's MorphTo that a MorphOne or MorphMany pairs with: the one named, or the one that lists the parent.
+     */
+    private function pair(ModelMap $parent, ModelMap $related): MorphTo
+    {
+        /** @var MorphOne|MorphMany $attribute */
+        $attribute = $this->attribute;
+        $found = [];
+        foreach ($related->relations as $name => $relation) {
+            if (
+                !$relation->attribute instanceof MorphTo
+                || $attribute->relation !== null && $attribute->relation !== $name
+            ) {
+                continue;
+            }
+            if (!in_array($parent->class, $relation->targets, true)) {
+                if ($attribute->relation !== null) {
+                    throw new \LogicException(
+                        "{$this->where} pairs with {$relation->where}, which does not list {$parent->class}; add it to that property's union type.",
+                    );
+                }
+                continue;
+            }
+            $found[$name] = $relation->attribute;
+        }
+        if (count($found) === 1) {
+            return array_values($found)[0];
+        }
+        throw new \LogicException(
+            $found === []
+                ? "{$this->where} needs a #[MorphTo] on {$related->class} that lists {$parent->class}; declare one, such as #[MorphTo] public {$parent->class}|... \$owner;."
+                : "{$this->where} could pair with "
+                . implode(' or ', array_map(
+                    static fn(string $name): string => "{$related->class}::\${$name}",
+                    array_keys($found),
+                ))
+                . "; name the one meant: #[MorphMany({$related->class}::class, relation: '"
+                . array_key_first($found)
+                . "')].",
+        );
+    }
+
+    /**
+     * The models a MorphTo's union type lists.
+     *
+     * @return list<class-string<Model>>
+     */
+    private static function targets(?\ReflectionType $type, string $where): array
+    {
+        $members = match (true) {
+            $type instanceof \ReflectionUnionType => $type->getTypes(),
+            $type instanceof \ReflectionNamedType => [$type],
+            default => [],
+        };
+        $targets = [];
+        foreach ($members as $member) {
+            if (!$member instanceof \ReflectionNamedType) {
+                $targets = [];
+                break;
+            }
+            if ($member->getName() === 'null') {
+                continue;
+            }
+            if (!is_subclass_of($member->getName(), Model::class)) {
+                $targets = [];
+                break;
+            }
+            $targets[] = $member->getName();
+        }
+        if ($targets === []) {
+            throw new \LogicException(
+                "{$where} is a MorphTo; declare the models it may belong to as its type, such as Post|Video, nullable when it may belong to none.",
+            );
+        }
+        return $targets;
     }
 
     private function field(ModelMap $map, string $column): Field
