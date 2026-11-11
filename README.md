@@ -1,6 +1,6 @@
 # Tide
 
-Tide adds typed models and explicit relations to the [Crab framework](https://github.com/crabphp/framework). Use a model for a whole row you read, change and save. Use the framework's query builder for arrays, and `into()` records for projections and reports.
+Tide adds typed models and explicit relations to the [Crab framework](https://github.com/crabphp/framework). New to it? Start with the [guide by use case](docs/guide.md); this README is the reference. Use a model for a whole row you read, change and save. Use the framework's query builder for arrays, and `into()` records for projections and reports.
 
 Tide is unreleased. It requires PHP 8.4 and the framework changes in this workspace; the published framework 0.6 releases do not yet include them. Install the local package with Composer's path repository during development. When available as a release, the package is `crabphp/tide`:
 
