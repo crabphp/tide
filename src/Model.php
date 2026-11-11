@@ -243,8 +243,22 @@ abstract class Model implements \JsonSerializable
         $map = ModelMap::of(static::class);
         $json = [];
         foreach ($map->visibleValues($this) as $name => $value) {
-            $json[$name] = $value instanceof \DateTimeInterface ? $value->format(\DateTimeInterface::ATOM) : $value;
+            $json[$name] = $value instanceof \DateTimeInterface ? $this->serializeDate($value) : $value;
         }
         return $json;
+    }
+
+    /**
+     * How a date of this model is written in JSON: ISO 8601 with its offset unless the model says
+     * otherwise, as an API that gives times as the database holds them does:
+     *
+     *     protected function serializeDate(\DateTimeInterface $date): string
+     *     {
+     *         return $date->format('Y-m-d H:i:s');
+     *     }
+     */
+    protected function serializeDate(\DateTimeInterface $date): string
+    {
+        return $date->format(\DateTimeInterface::ATOM);
     }
 }

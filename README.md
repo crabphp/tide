@@ -177,7 +177,7 @@ When a transaction is rolled back, the models saved or deleted in it are again w
 $json = json_encode(Book::query()->with('author')->find(1), JSON_THROW_ON_ERROR);
 ```
 
-JSON includes initialized columns and loaded relations in declaration order, without `#[Hidden]` properties. Hidden getters and unmapped virtual getters are never evaluated; no public property name is reserved. Dates use ATOM text; enums, arrays and nested models are handled by `json_encode()`. Avoid serializing a cycle of loaded relations.
+JSON includes initialized columns and loaded relations in declaration order, without `#[Hidden]` properties. Hidden getters and unmapped virtual getters are never evaluated; no public property name is reserved. Dates use ATOM text unless the model overrides `serializeDate(\DateTimeInterface $date): string`, as an API that gives times as the database holds them does; enums, arrays and nested models are handled by `json_encode()`. Avoid serializing a cycle of loaded relations.
 
 A `#[Json]` array is compared as PHP compares arrays. An object placed inside one and changed in place is not seen as a change; assign the array again.
 

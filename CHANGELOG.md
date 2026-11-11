@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- A model says how its dates are written in JSON by overriding `serializeDate()`; ISO 8601 with the offset unless it does.
 - `whereRaw()` and `orWhereRaw()` on a model query, with bindings, for a condition it has no method for; `tap()` inside a condition closure is refused and points to them.
 - On a many-to-many relation, the columns given to `pluck()`, `count()`, `chunkById()` and a two-argument `whereColumn()` are the related model's.
 - An empty filter (an empty array, an empty group, a `when()` that adds nothing) before the first `orWhere()` of a `related()` query no longer lets that `orWhere()` reach every child.

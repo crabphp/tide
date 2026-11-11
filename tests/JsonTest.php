@@ -12,6 +12,15 @@ use PHPUnit\Framework\Attributes\DataProvider;
 final class JsonTest extends DatabaseTestCase
 {
     #[DataProvider('drivers')]
+    public function testAModelCanSayHowItsDatesAreWritten(string $driver): void
+    {
+        $this->start($driver);
+        $this->db->table('tide_books')->where('id', 1)->update(['published_at' => '2026-05-06 07:08:09']);
+        self::assertSame('2026-05-06T07:08:09+00:00', Book::find(1)->jsonSerialize()['publishedAt']);
+        self::assertSame('2026-05-06 07:08:09', PlainDateBook::find(1)->jsonSerialize()['published_at']);
+    }
+
+    #[DataProvider('drivers')]
     public function testJsonContainsColumnsDatesEnumsAndOnlyLoadedVisibleRelations(string $driver): void
     {
         $this->start($driver);
@@ -44,5 +53,18 @@ final class JsonTest extends DatabaseTestCase
             ['title' => 'New', 'author_id' => null],
             json_decode(json_encode($book, JSON_THROW_ON_ERROR), true, flags: JSON_THROW_ON_ERROR),
         );
+    }
+}
+
+#[\Crab\Tide\Table('tide_books')]
+final class PlainDateBook extends \Crab\Tide\Model
+{
+    public int $id;
+    public string $title;
+    public ?\DateTimeImmutable $published_at;
+
+    protected function serializeDate(\DateTimeInterface $date): string
+    {
+        return $date->format('Y-m-d H:i:s');
     }
 }
