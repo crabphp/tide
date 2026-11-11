@@ -67,11 +67,12 @@ abstract class Model implements \JsonSerializable
                 );
             }
             // The times #[Timestamps] keeps, where the application gave none.
-            $stamps = [];
+            $stamps = $before = [];
             foreach (array_filter([$map->createdAt, $map->updatedAt]) as $stamp) {
                 if (($values[$stamp->property] ?? null) !== null) {
                     continue;
                 }
+                $before[$stamp->property] = array_key_exists($stamp->property, $values);
                 $stamps[$stamp->property] = $values[$stamp->property] = Tide::now();
             }
             $written = [];
@@ -89,7 +90,9 @@ abstract class Model implements \JsonSerializable
             }
             $connection = Tide::database($map->database)->current();
             $id = $connection->table($map->table)->insert($written);
-            $this->undoneBy($map, $connection, null, $givenKey ? null : $key->property);
+            // Undone, the key the database gave and the times Tide wrote are forgotten too.
+            $forget = $givenKey ? [] : [$key->property => false];
+            $this->undoneBy($map, $connection, null, [...$forget, ...$before]);
             foreach ($stamps as $name => $value) {
                 $map->assign($this, $name, $value);
             }
@@ -136,7 +139,13 @@ abstract class Model implements \JsonSerializable
         }
         $connection = Tide::database($map->database)->current();
         $connection->table($map->table)->where($key->column, $this->storedValues[$key->property])->update($written);
-        $this->undoneBy($map, $connection, $this->storedValues);
+        $restore = [];
+        if ($stamp !== null) {
+            $restore[$stamp->property] = $map->initialized($this, $stamp->property)
+                ? [$map->value($this, $stamp->property)]
+                : false;
+        }
+        $this->undoneBy($map, $connection, $this->storedValues, $restore);
         if ($stamp !== null) {
             $map->assign($this, $stamp->property, $changed[$stamp->property]);
         }
@@ -169,17 +178,24 @@ abstract class Model implements \JsonSerializable
     /**
      * If the transaction a write ran in is rolled back, the model is again
      * what the database holds: new, or stored with the values it had, so
-     * that running the transaction again writes it again.
+     * that running the transaction again writes it again. What Tide itself
+     * put in a property, a generated key or a kept time, goes back to what
+     * it was; what the application assigned stays.
      *
      * @param array<string, mixed>|null $before The stored values before the write.
-     * @param string|null $generated The key property the database filled, to be emptied again.
+     * @param array<string, bool|array{mixed}> $restore Per property Tide filled: false or true for
+     *     uninitialised or null before, or the value it held, in a one-item list.
      */
-    private function undoneBy(ModelMap $map, Connection $connection, ?array $before, ?string $generated = null): void
+    private function undoneBy(ModelMap $map, Connection $connection, ?array $before, array $restore = []): void
     {
-        $connection->afterRollback(function () use ($map, $before, $generated): void {
+        $connection->afterRollback(function () use ($map, $before, $restore): void {
             $this->storedValues = $before;
-            if ($generated !== null) {
-                $map->forget($this, $generated);
+            foreach ($restore as $name => $was) {
+                match (true) {
+                    $was === false => $map->forget($this, $name),
+                    $was === true => $map->assign($this, $name, null),
+                    default => $map->assign($this, $name, $was[0]),
+                };
             }
         });
     }

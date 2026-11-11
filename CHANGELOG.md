@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- `whereRaw()` and `orWhereRaw()` on a model query, with bindings, for a condition it has no method for; `tap()` inside a condition closure is refused and points to them.
+- On a many-to-many relation, the columns given to `pluck()`, `count()`, `chunkById()` and a two-argument `whereColumn()` are the related model's.
+- An empty filter (an empty array, an empty group, a `when()` that adds nothing) before the first `orWhere()` of a `related()` query no longer lets that `orWhere()` reach every child.
+- A rollback puts back the times Tide wrote, so a retry stamps its own; kept times are in PHP's default zone, as they read back.
 - A model that only extends `Model` works: its table is named after the class (`OrderItem` reads `order_items`), a property that is another model belongs to it, and relation keys and the pivot are named after the models. `#[Table]` and the relation attributes' names are now optional and say the exceptions.
 - `created_at` and `updated_at` are kept when a model declares them as dates, in saves and in bulk changes, from the application's clock. `#[Timestamps]` names other columns or turns one off. `Tide::use()` takes the clock as a second argument.
 - A null property is left out of an insert, so the database's default applies.

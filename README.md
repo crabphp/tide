@@ -83,7 +83,7 @@ Public, backed properties are columns; private, protected, static and virtual pr
 
 ## Reading
 
-Conditions and ordering use the query builder's parameters, except that a closure given to `where()` or `orWhere()` receives a `ModelQuery`, with its conditions grouped. It can combine `whereHas()`, `whereDoesntHave()` and ordinary conditions. Builder grouping through `tap()` still receives the framework's `Query`. Inside such a closure the query can only be given conditions: running or cloning it there is refused, since the conditions being written are not yet part of it. A query returns a PHP list of models, and `first()` or `find()` returns a model or null:
+Conditions and ordering use the query builder's parameters, except that a closure given to `where()` or `orWhere()` receives a `ModelQuery`, with its conditions grouped. It can combine `whereHas()`, `whereDoesntHave()` and ordinary conditions. Builder grouping through `tap()` still receives the framework's `Query`. Inside such a closure the query can only be given conditions: running, cloning or tapping it there is refused, since the conditions being written are not yet part of it. A condition the model query has no method for is written with `whereRaw('quantity * price >= ?', [100])` or `orWhereRaw()`, there and anywhere else; every value is a binding. A query returns a PHP list of models, and `first()` or `find()` returns a model or null:
 
 ```php
 // reading.php
@@ -138,7 +138,7 @@ $book->delete();
 $book->save();
 ```
 
-A model that declares `created_at` and `updated_at` as dates has them kept: both when it is first saved, and `updated_at` at each change, bulk `update()`, `increment()` and `decrement()` included. A time you set yourself is written as you set it, and a save that changes nothing writes nothing. The time is the application's clock, to the second.
+A model that declares `created_at` and `updated_at` as dates has them kept, in PHP's default time zone, the one they are read back in: both when it is first saved, and `updated_at` at each change, bulk `update()`, `increment()` and `decrement()` included. A time you set yourself is written as you set it, and a save that changes nothing writes nothing. The time is the application's clock, to the second.
 
 A null property is left out of the insert, so the database gives the column its default, or null when it has none. The model learns what the database filled when you `refresh()` it. On a stored model null is a value like any other, and assigning it writes null.
 
@@ -168,7 +168,7 @@ A nested transaction on the callback's connection uses a savepoint. A nested cal
 
 Only model calls follow the transaction. A query builder call on the database itself, `$database->table(...)`, still borrows another connection and runs outside it; inside a transaction use the connection the callback is given, or `$database->current()`.
 
-When a transaction is rolled back, the models saved or deleted in it are again what the database holds: a new model is new, with its generated key emptied, and a stored one has the values it had. So the same callback can be run again, after a deadlock for one, and writes them again. The properties keep what you assigned.
+When a transaction is rolled back, the models saved or deleted in it are again what the database holds: a new model is new, with its generated key emptied, and a stored one has the values it had. So the same callback can be run again, after a deadlock for one, and writes them again, with the times of the attempt that commits. The properties keep what you assigned; what Tide filled in, a generated key or a kept time, goes back to what it was. When a commit fails without saying whether it happened, as when the connection is lost while the database answers, the models are left as stored: check the row before saving them again.
 
 ## JSON and limits
 

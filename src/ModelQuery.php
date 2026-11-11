@@ -69,6 +69,11 @@ final class ModelQuery
 
     public function tap(\Closure $callback): static
     {
+        if ($this->conditions !== null) {
+            throw new \LogicException(
+                "{$this->map->class} query cannot be tapped inside the closure of where(), with(), whereHas() or whereDoesntHave(); write a condition the model query has no method for with whereRaw().",
+            );
+        }
         $this->assertCurrent();
         $callback($this->query);
         return $this;
@@ -204,7 +209,11 @@ final class ModelQuery
         if (func_num_args() < 3) {
             $column = $this->map->requireKey()->column;
         }
-        $this->query->chunkById($size, fn(array $rows): mixed => $callback($this->models($rows)), $column);
+        $this->query->chunkById(
+            $size,
+            fn(array $rows): mixed => $callback($this->models($rows)),
+            $this->named($column),
+        );
     }
 
     public function update(array $values): int
@@ -310,6 +319,27 @@ final class ModelQuery
         return $this;
     }
 
+    /**
+     * A condition written in SQL, for what the model query has no method for, such as
+     * whereRaw('quantity * price >= ?', [100]). Every value is a binding.
+     *
+     * @param list<mixed> $bindings
+     */
+    public function whereRaw(string $sql, array $bindings = []): static
+    {
+        $this->condition('whereRaw', [$sql, $bindings]);
+        return $this;
+    }
+
+    /**
+     * @param list<mixed> $bindings
+     */
+    public function orWhereRaw(string $sql, array $bindings = []): static
+    {
+        $this->condition('orWhereRaw', [$sql, $bindings]);
+        return $this;
+    }
+
     public function whereColumn(string $first, string $operator, ?string $second = null): static
     {
         $this->condition('whereColumn', [$first, $operator, $second]);
@@ -396,7 +426,7 @@ final class ModelQuery
     public function count(string $column = '*'): int
     {
         $this->assertCurrent();
-        return $this->query->count($column);
+        return $this->query->count($column === '*' ? $column : $this->named($column));
     }
 
     public function sum(string $column): int|float
@@ -426,7 +456,7 @@ final class ModelQuery
     public function pluck(string $column, ?string $key = null): array
     {
         $this->assertCurrent();
-        return $this->query->pluck($this->named($column), $key);
+        return $this->query->pluck($this->named($column), $key === null ? null : $this->named($key));
     }
 
     public function value(string $column): mixed
@@ -547,15 +577,21 @@ final class ModelQuery
                 $arguments[0] = $named;
             }
             if ($method === 'whereColumn' || $method === 'orWhereColumn') {
-                $arguments[2] = isset($arguments[2]) ? $this->named($arguments[2]) : null;
+                // Without an operator, the second is the other column.
+                $other = isset($arguments[2]) ? 2 : 1;
+                $arguments[$other] = $this->named((string) $arguments[$other]);
             }
         }
-        if ($this->scope !== null && $this->conditions === null) {
-            // The first condition after the parent's has nothing to be an alternative to.
-            if (!$this->filtered && str_starts_with($method, 'orWhere')) {
+        if ($this->scope !== null && $this->conditions === null && !$this->filtered) {
+            // The first condition after the parent's has nothing to be an alternative to. One that
+            // adds nothing, an empty array or group, does not count as the first.
+            if (str_starts_with($method, 'orWhere')) {
                 $method = lcfirst(substr($method, 2));
             }
-            $this->filtered = true;
+            $before = $this->query->toSql();
+            $this->query->{$method}(...$arguments);
+            $this->filtered = $this->query->toSql() !== $before;
+            return;
         }
         if ($this->scope !== null && $this->conditions === null && str_starts_with($method, 'orWhere')) {
             $scope = $this->scope;

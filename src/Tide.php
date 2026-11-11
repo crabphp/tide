@@ -40,7 +40,10 @@ final class Tide
             }
             self::$clock = $clock;
         }
-        $now = $clock === null ? new \DateTimeImmutable() : $clock->now();
+        // In the zone a date is read back in, so that a model saved and the same model read show one time.
+        $now = ($clock === null ? new \DateTimeImmutable() : $clock->now())->setTimezone(
+            new \DateTimeZone(date_default_timezone_get()),
+        );
         return $now->setTime((int) $now->format('G'), (int) $now->format('i'), (int) $now->format('s'));
     }
 

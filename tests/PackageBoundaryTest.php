@@ -48,10 +48,11 @@ final class PackageBoundaryTest extends TestCase
             'groupBy',
             'having',
             'into',
-            'whereRaw',
         ] as $method) {
             self::assertFalse(method_exists(ModelQuery::class, $method));
         }
+        // A condition in SQL is offered, with bindings: it narrows the rows and never changes their shape.
+        self::assertTrue(method_exists(ModelQuery::class, 'whereRaw'));
         self::assertFalse(is_subclass_of(ModelQuery::class, \Crab\Contracts\Database\Query::class));
     }
 }
