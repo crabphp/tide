@@ -119,6 +119,36 @@ abstract class Model implements \JsonSerializable
     }
 
     /**
+     * Saves each model, new or stored, as save() does, in one transaction: all of
+     * them are written, or none is. Inside a transaction already, it is a savepoint
+     * of it. Returns the same models, which now hold their keys and times.
+     *
+     * @param list<static> $models
+     * @return list<static>
+     */
+    public static function saveMany(array $models): array
+    {
+        if ($models === []) {
+            return [];
+        }
+        foreach ($models as $model) {
+            if (!$model instanceof static || $model::class !== static::class) {
+                throw new \LogicException(static::class
+                . '::saveMany() takes models of that class; save one class at a time.');
+            }
+        }
+        $map = ModelMap::of(static::class);
+        Tide::database($map->database)
+            ->current()
+            ->transaction(static function () use ($models): void {
+                foreach ($models as $model) {
+                    $model->save();
+                }
+            });
+        return $models;
+    }
+
+    /**
      * Inserts new models of this class in as few statements as can hold them, and
      * returns how many rows were inserted. Each is written as save() writes it: its
      * values converted, its times kept, a null left to the database. A model whose

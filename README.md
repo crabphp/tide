@@ -140,6 +140,15 @@ $book->save();
 
 A model that declares `created_at` and `updated_at` as dates has them kept, in PHP's default time zone, the one they are read back in: both when it is first saved, and `updated_at` at each change, bulk `update()`, `increment()` and `decrement()` included. A time you set yourself is written as you set it, and a save that changes nothing writes nothing. The time is the application's clock, to the second.
 
+`saveMany()` saves several models of one class, new or stored, in one transaction, so that all are written or none is, and returns them with their keys and times:
+
+```php
+// save-many.php
+[$ada, $grace] = Author::saveMany([new Author('Ada'), new Author('Grace')]);
+```
+
+It is `save()` for each, one statement apiece. Inside a transaction already, it is a savepoint of it.
+
 Many new models of one class are inserted together with `insertMany()`, which returns how many rows it inserted:
 
 ```php
