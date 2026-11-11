@@ -129,6 +129,21 @@ final class ModelMap
         }
     }
 
+    /**
+     * Makes a property uninitialised again, as it was before the database gave it a value.
+     */
+    public function forget(Model $model, string $name): void
+    {
+        $forget = function () use ($name): void {
+            unset($this->{$name});
+        };
+        try {
+            \Closure::bind($forget, $model, $this->readers[$name]->getDeclaringClass()->getName())();
+        } catch (\Error) {
+            // A hooked property cannot be unset; it keeps the value the rollback undid.
+        }
+    }
+
     public function snapshot(Field $field, mixed $value): mixed
     {
         if ($field->cast !== null && is_object($value)) {

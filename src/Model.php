@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Crab\Tide;
 
+use Crab\Contracts\Database\Connection;
+
 abstract class Model implements \JsonSerializable
 {
     /**
@@ -80,7 +82,9 @@ abstract class Model implements \JsonSerializable
                 throw new \LogicException(static::class
                 . '::save() has no value to write; give at least one column a value before saving.');
             }
-            $id = Tide::database($map->database)->current()->table($map->table)->insert($written);
+            $connection = Tide::database($map->database)->current();
+            $id = $connection->table($map->table)->insert($written);
+            $this->undoneBy($map, $connection, null, $givenKey ? null : $key->property);
             foreach ($stamps as $name => $value) {
                 $map->assign($this, $name, $value);
             }
@@ -125,11 +129,9 @@ abstract class Model implements \JsonSerializable
         } else {
             $stamp = null;
         }
-        Tide::database($map->database)
-            ->current()
-            ->table($map->table)
-            ->where($key->column, $this->storedValues[$key->property])
-            ->update($written);
+        $connection = Tide::database($map->database)->current();
+        $connection->table($map->table)->where($key->column, $this->storedValues[$key->property])->update($written);
+        $this->undoneBy($map, $connection, $this->storedValues);
         if ($stamp !== null) {
             $map->assign($this, $stamp->property, $changed[$stamp->property]);
         }
@@ -153,12 +155,28 @@ abstract class Model implements \JsonSerializable
         if ($this->storedValues === null) {
             throw new \LogicException(static::class . '::delete() needs a stored model; save it before deleting it.');
         }
-        Tide::database($map->database)
-            ->current()
-            ->table($map->table)
-            ->where($key->column, $this->storedValues[$key->property])
-            ->delete();
+        $connection = Tide::database($map->database)->current();
+        $connection->table($map->table)->where($key->column, $this->storedValues[$key->property])->delete();
+        $this->undoneBy($map, $connection, $this->storedValues);
         $this->storedValues = null;
+    }
+
+    /**
+     * If the transaction a write ran in is rolled back, the model is again
+     * what the database holds: new, or stored with the values it had, so
+     * that running the transaction again writes it again.
+     *
+     * @param array<string, mixed>|null $before The stored values before the write.
+     * @param string|null $generated The key property the database filled, to be emptied again.
+     */
+    private function undoneBy(ModelMap $map, Connection $connection, ?array $before, ?string $generated = null): void
+    {
+        $connection->afterRollback(function () use ($map, $before, $generated): void {
+            $this->storedValues = $before;
+            if ($generated !== null) {
+                $map->forget($this, $generated);
+            }
+        });
     }
 
     public function refresh(): static

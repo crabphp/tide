@@ -101,4 +101,9 @@ final class RecordingDatabase implements Database
     {
         $this->database->afterCommit($callback);
     }
+
+    public function afterRollback(\Closure $callback): void
+    {
+        $this->database->afterRollback($callback);
+    }
 }

@@ -32,12 +32,12 @@ final class TransactionTest extends DatabaseTestCase
                 throw new \RuntimeException('rollback');
             });
         } catch (\RuntimeException) {
-            // The object keeps its snapshot; the database rolls the row back.
+            // The database rolls the row back, and the model is new again.
         }
         self::assertSame([5, 4, 'Rolled back'], $inside);
         self::assertSame(4, Book::query()->count());
-        self::assertTrue($book->stored());
-        self::assertNull(Book::find($book->id));
+        self::assertFalse($book->stored());
+        self::assertFalse(isset($book->id));
     }
 
     #[DataProvider('drivers')]

@@ -64,4 +64,9 @@ final class RecordingConnection implements Connection
     {
         $this->connection->afterCommit($callback);
     }
+
+    public function afterRollback(\Closure $callback): void
+    {
+        $this->connection->afterRollback($callback);
+    }
 }
