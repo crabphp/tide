@@ -2,6 +2,8 @@
 
 Tide gives Crab models: a class per table, whose objects you read, change and save. This guide goes through what an application does with them, with the [sample shop](https://github.com/crabphp/sample)'s own models as examples. The [README](../README.md) is the reference, with every rule; its examples are run by the tests.
 
+Tide is a separate package, not yet released: it needs the framework's `main` branch, and is installed from [its repository](https://github.com/crabphp/tide) for now.
+
 - [Setting up](#setting-up)
 - [Declaring a model](#declaring-a-model)
 - [Reading](#reading)
