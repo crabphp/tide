@@ -1,0 +1,41 @@
+{
+    "name": "crabphp/tide",
+    "description": "Typed models and explicit relations for the Crab framework",
+    "type": "library",
+    "license": "MIT",
+    "require": {
+        "php": "^8.4",
+        "crabphp/framework": "^0.6"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^13.4",
+        "carthage-software/mago": "1.57.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Crab\\Tide\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Crab\\Tide\\Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "test": "@php vendor/bin/phpunit",
+        "format": "@php vendor/bin/mago fmt",
+        "format:check": "@php vendor/bin/mago fmt --check",
+        "lint": "@php vendor/bin/mago lint"
+    },
+    "repositories": [
+        {
+            "type": "path",
+            "url": "../framework",
+            "options": {
+                "symlink": true
+            }
+        }
+    ],
+    "minimum-stability": "dev",
+    "prefer-stable": true
+}
