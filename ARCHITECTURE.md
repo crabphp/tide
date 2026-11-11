@@ -7,16 +7,16 @@ Status: **implemented, unreleased, 2026-11-11.** The framework's own design is i
 Tide (`crabphp/tide`) is a package that adds models to Crab: a class per table, whose objects are read, changed and saved, and which knows its related rows.
 
 ```php
-#[Table('books')]
 final class Book extends Model
 {
     public int $id;
+    public ?\DateTimeImmutable $created_at = null;
+    public ?\DateTimeImmutable $updated_at = null;
 
-    #[BelongsTo('author_id')]
     public ?Author $author;
 
     /** @var list<Chapter> */
-    #[HasMany(Chapter::class, 'book_id')]
+    #[HasMany(Chapter::class)]
     public array $chapters;
 
     public function __construct(
@@ -54,11 +54,11 @@ Decision 6 of the framework stays as written: the framework has no model layer, 
 
 | Framework goal | What it means here |
 | --- | --- |
-| Lean | One base class, one query class, four relation attributes, explicit table mapping and JSON hiding. No inflector, no collection class, no events. A model costs nothing an application does not use. |
+| Lean | One base class, one query class, four relation attributes and JSON hiding. The names it assumes come from three small rules, not an inflector's dictionary. No collection class, no events. A model costs nothing an application does not use. |
 | Long-running by design | A model holds no connection and no shared state. There is no identity map, no registry of models and nothing booted. What is cached is read from code alone, so one copy serves every worker and request. |
 | Async drivers | A query is a place where the worker may serve another request. So a query only ever runs at a call that looks like one: `get()`, `find()`, `save()`. Reading a property never runs a query. |
 | Measured | Reading rows into models is measured against arrays and against records, with the JIT off, and the numbers are kept in `BENCHMARKS.md`. |
-| Readable by people and agents | Every column is a typed property. A table and a key are named where they are used, never guessed from a class name. There is no magic property access or method dispatch: every call on a model or a model query has a real signature. |
+| Readable by people and agents | Every column is a typed property. There is no magic property access or method dispatch: every call on a model or a model query has a real signature. A name Tide assumes follows one written rule, and an attribute beside the property says it where it differs. |
 | One way to do each thing | A model is made with `new`. A query starts at `query()`. Relations are loaded explicitly with `with()` or `Model::load()`. There is no second spelling of any of them. |
 
 ### Three ways to read a table
@@ -94,16 +94,19 @@ tide/
 
 ### What the framework gains
 
-Four changes, each small and useful without this package.
+Five changes, each small and useful without this package.
 
 1. **`Database::current()`**, in the contract: the connection the calling fiber was lent by `transaction()` or `run()`, and the database itself when there is none. See [Connections and transactions](#connections-and-transactions).
 2. **`#[Json]` and `#[ColumnName]` on a property.** Both now accept a property as well as a constructor parameter.
 3. **Reading and writing one value by its type**, behind a contract. `Contracts\Database\Field` now owns conversion, and `RecordMap` reads record declarations. A date, an enum and a bool must cross the same way for a model as for a record, so there is one implementation, the framework's.
 4. **A backed enum in a condition.** The drivers write a date given to `where()` as text and a backed enum as its value, so that `where('status', OrderStatus::Shipped)` reads as it should, with or without models.
+5. **`Connection::afterRollback()`**, the opposite of `afterCommit()`: it runs if the transaction that asked, or one around it, is rolled back or loses its connection. A model uses it to forget a write that did not happen.
 
 ## The model
 
-A model is a concrete class that extends `Crab\Tide\Model` and names its table with `#[Table]`.
+A model is a concrete class that extends `Crab\Tide\Model`. Nothing else is required of it.
+
+**What a model leaves unsaid is named after its classes.** This is where Tide departs from the framework's rule that nothing is switched by a naming convention, by the owner's decision of 2026-11-11: a model that only extends `Model` should work, as one does in Laravel. Each assumed name follows one rule written in the tables below, an attribute overrides it, and a wrong one fails loudly, as the database's error naming the table or as Tide's naming the missing column.
 
 **It is a base class, not a trait,** which is where this differs from Tempest. A response is written with `json_encode()`, which writes every public property of a plain object. Only a class that implements `JsonSerializable` can leave a `#[Hidden]` property out, and a trait cannot implement an interface. With a trait, forgetting two words on a class would send a password hash. A base class also gives the mapper a type to refuse everything else by.
 
@@ -120,8 +123,8 @@ A model is a concrete class that extends `Crab\Tide\Model` and names its table w
 | The column's name | The property's name. `#[ColumnName]` gives another. Nothing is converted between snake and camel case |
 | Types | Those of a record: `int`, `float`, `string`, `bool`, a backed enum, `DateTimeImmutable`, an array with `#[Json]`, anything else with a `Cast` |
 | Refused | No type, a union type, `readonly`, `DateTime`, an array without `#[Json]`, two properties on one column. Said on first use, naming the property and what to write instead |
-| The table | `#[Table('books')]`, required. No name is guessed from the class |
-| The key | `id`, or `#[Table('books', key: 'uuid')]`. One column, an `int` or a `string`. A model with no such property can be read but not found, saved or deleted |
+| The table | The class in snake case and plural, by `s`, `es` or `ies`: `Book` reads `books`, `OrderItem` reads `order_items`, `Category` reads `categories`. `#[Table('people')]` names another |
+| The key | `id`, or `#[Table(key: 'uuid')]`. One column, an `int` or a `string`. A model with no such property can be read but not found, saved or deleted |
 | Another database | `#[Table('totals', database: 'reports')]`, a name from `database.connections` |
 | Parents | A model may extend an abstract model, whose properties are its own. Several classes in one table are not supported |
 | A column the table lacks | The database's error, which names it. Nothing checks a model against its table beforehand: the database is the source of truth |
@@ -159,13 +162,17 @@ A model keeps one thing of its own: the values it was read with, or null while i
 
 ## Relations
 
-A relation is a plain public property with an attribute. Hooks and asymmetric setter visibility are refused when the model is mapped, so loading and unloading are supported. The key is always written; the class is the property's type, or named in the attribute where the type is `array`.
+A relation is a plain public property with an attribute. Hooks and asymmetric setter visibility are refused when the model is mapped, so loading and unloading are supported. The class is the property's type, or named in the attribute where the type is `array`. A property whose type is another model belongs to it with no attribute at all. The keys are named after the models unless the attribute names them.
 
 ```php
-#[BelongsTo('author_id')]                                              public ?Author $author;
-#[HasOne('book_id')]                                                   public ?Isbn $isbn;
-#[HasMany(Chapter::class, 'book_id')]                                  public array $chapters;
-#[BelongsToMany(Tag::class, pivot: 'book_tag', key: 'book_id', relatedKey: 'tag_id')] public array $tags;
+public ?Author $author;                               // belongs to: author_id, the property's name
+#[HasOne] public ?Isbn $isbn;                         // isbns.book_id, this model's name
+#[HasMany(Chapter::class)] public array $chapters;    // chapters.book_id
+#[BelongsToMany(Tag::class)] public array $tags;      // pivot book_tag, both names in alphabetical order, with book_id and tag_id
+
+#[BelongsTo('written_by')] public ?Author $author;    // each name can be said instead
+#[HasMany(Chapter::class, 'volume_id')] public array $chapters;
+#[BelongsToMany(Tag::class, pivot: 'taggings', key: 'item_id', relatedKey: 'tag_id')] public array $tags;
 ```
 
 There are three ways to reach related rows, and each is a call.
@@ -205,7 +212,7 @@ $author->related('books')->latest('id')->limit(5)->get();   // as a query of its
 | `save()` on a new model | An insert of the properties that have a value. The rest are left to the database's defaults |
 | The key the database makes | Set on the model, for an `int` key. A `string` key is given before saving |
 | Columns the database fills | Uninitialised after the insert. `refresh()` reads them; nothing reads them unasked |
-| A column the database should fill | Declared with no default, `public ?\DateTimeImmutable $created_at;`, so that it is uninitialised and left out of the insert. With `= null` it has a value, and null is written in place of the database's default |
+| A null property on insert | Left out, so the database gives the column its default, or null when it has none. `refresh()` reads what it filled. On a stored model null is a value like any other and is written |
 | A new model with no value at all | Refused |
 | `save()` on a read model | An update of the columns that changed, by the key it was read with. No change, no statement |
 | What counts as changed | A value that differs from the one read: scalars and arrays strictly, a date by its instant, an object of a `Cast` by what it writes, which sees a change made inside it |
@@ -215,7 +222,7 @@ $author->related('books')->latest('id')->limit(5)->get();   // as a query of its
 | A save the database refuses | The model is as it was, and can be corrected and saved again |
 | `delete()` | By key. The model is new again. Deleting a new model is refused. What is deleted with it is for foreign keys to say |
 | `refresh()` | Reads the row again and unloads its relations. Refused when the row is gone |
-| `created_at`, `updated_at` | Set by the application or by the database. Nothing is written that the code did not write |
+| `created_at`, `updated_at` | Kept when the model declares them as dates: both at the first save, `updated_at` at each change, bulk `update()`, `increment()` and `decrement()` included. A time the application set is written as set; a save that changes nothing writes nothing. The time is the application's clock, to the second. `#[Timestamps]` names other columns, or null for one kept by hand |
 
 ## Connections and transactions
 
@@ -239,7 +246,8 @@ Every statement of a model then runs on `current()` of its database. A `ModelQue
 | Outside a fiber, in a command or a test | One place stands for the main context |
 | A fiber that ends mid-transaction | Kept by weak reference, so nothing is left behind |
 | A model of another database | Current is kept for each database. No transaction spans two |
-| A save, and then the transaction is rolled back | The object still believes it is stored. Discard models written in a transaction that failed |
+| A save or a delete, and then the transaction is rolled back | The model is again what the database holds: a new one is new, its generated key emptied, and a stored one has the values it had. Running the callback again, after a deadlock for one, writes it again. An inner transaction's rollback undoes only what was written in it |
+| A query builder call on the database inside a transaction | Outside it, on another connection, as the framework has it. Only model calls follow the transaction; use the callback's connection or `current()` for the builder |
 | No `TidePlugin` | Refused on the first call, saying to list it |
 
 **Why ambient, in a framework with no hidden globals.** The other design passes the connection: `Book::query($tx)`, `$book->save($tx)`. Leaving it out would then run the statement outside the transaction, silently, and be found in production. A mistake that cannot be seen is worse for a reader, and for an agent, than one rule that is always true: a model call is in the transaction it is written in. The state is kept for the length of the transaction's callback and cleared as it returns, so it is bound to the code a reader is looking at.
@@ -268,16 +276,16 @@ The suite covers mapping, persistence, query forwarding, relations, transactions
 - Loading a relation by reading a property.
 - Model events, observers and global scopes.
 - A collection class. A list of models is a PHP list.
-- Table and key names guessed from class names.
-- Timestamps and soft deletes written for the application.
+- Soft deletes.
+- A dictionary of irregular plurals. `#[Table]` names the table of a word English makes plural another way.
 - Validation rules on a model. A request is validated by its action.
 - Polymorphic relations, relations through another model, keys of several columns.
 - A generator, `make:model`, and a check of models against the schema.
 
 ## Settled choices
 
-- The four framework changes are implemented; `Contracts\Database\Field` is shared by records and models.
+- The five framework changes are implemented; `Contracts\Database\Field` is shared by records and models.
 - The database's own statements still borrow from its pool. `current()` exposes the current loan without changing existing callers.
-- Timestamps remain the application's or database's responsibility.
+- Names are assumed from the classes and times are kept, both since 2026-11-11, by the owner's decision; attributes say the exceptions.
 - Relations are writable properties with no defaults. Readonly relation properties are refused because loading again and unloading after a changed foreign key must work.
 - The framework's no-ORM scope stays unchanged; Tide is an optional, unreleased package. No sample or skeleton changes belong to this work.

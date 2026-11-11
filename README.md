@@ -20,7 +20,7 @@ return App::configure(__DIR__)
     ->create();
 ```
 
-The plugin resolves the application's database on first use. In a standalone test, give Tide your database:
+The plugin resolves the application's database and clock on first use. In a standalone test, give Tide your database, and a clock as a second argument when the test holds the time still:
 
 ```php
 // test-setup.php
@@ -31,45 +31,55 @@ Tide::use($database);
 
 ## Models
 
-Name the table and declare its columns. A constructor is for making a new model; reading a row never calls it. The database supplies an integer key when you leave it uninitialized. Supply a string key yourself.
+A model extends `Model` and declares its columns as typed properties. A constructor is for making a new model; reading a row never calls it. The database supplies an integer key when you leave it uninitialized. Supply a string key yourself.
 
 ```php
 // models.php
-use Crab\Tide\BelongsTo;
 use Crab\Tide\HasMany;
 use Crab\Tide\Hidden;
 use Crab\Tide\Model;
-use Crab\Tide\Table;
 
-#[Table('authors')]
 final class Author extends Model
 {
     public int $id;
 
-    #[HasMany(Book::class, 'author_id')]
+    #[HasMany(Book::class)]
     public array $books;
 
     public function __construct(public string $name) {}
 }
 
-#[Table('books')]
 final class Book extends Model
 {
     public int $id;
+    public ?\DateTimeImmutable $created_at = null;
+    public ?\DateTimeImmutable $updated_at = null;
 
     #[Hidden]
     public string $internal_note;
 
-    #[BelongsTo('author_id')]
     public ?Author $author;
 
     public function __construct(public string $title, public ?int $author_id) {}
 }
 ```
 
+What a model leaves unsaid is named after its classes, and an attribute says it only where the name differs:
+
+| | Unsaid | Said |
+| --- | --- | --- |
+| Table | The class in snake case and plural: `Book` reads `books`, `OrderItem` reads `order_items`, `Category` reads `categories` | `#[Table('people')]` |
+| Key | `id` | `#[Table(key: 'uuid')]` |
+| Times | `created_at` and `updated_at` are kept when declared as dates | `#[Timestamps(updated: 'modified_at')]`, or `null` for one kept by hand |
+| A property that is another model | Belongs to it, by the property's name and `_id`: `$author` reads `author_id` | `#[BelongsTo('written_by')]` |
+| `#[HasOne]`, `#[HasMany(Chapter::class)]` | The related table's column named after this model: `book_id` | `#[HasMany(Chapter::class, 'volume_id')]` |
+| `#[BelongsToMany(Tag::class)]` | The pivot is both names in alphabetical order, `book_tag`, with `book_id` and `tag_id` | `#[BelongsToMany(Tag::class, pivot: 'taggings', key: 'item_id', relatedKey: 'tag_id')]` |
+
+The plural is made with `s`, `es` or `ies`. A word English makes plural another way, `person`, is named with `#[Table]`. A name Tide assumed wrongly fails loudly, as the database's error naming the table or as Tide's naming the missing column, and one attribute corrects it.
+
 Public, backed properties are columns; private, protected, static and virtual properties are not. Columns accept the framework's record types and casts, including backed enums, `DateTimeImmutable`, `#[Json]` arrays and custom `Cast` attributes. `#[ColumnName('created_at')]` maps another column name. Persistence reads and writes raw column values without running hooks, including stored keys and relation matching. Application reads and writes still run their hooks, and JSON uses the getter's view. Columns with `public private(set)` or `public protected(set)` are supported; readonly columns are refused. Relations must be plain public properties without hooks or asymmetric setter visibility.
 
-`#[Table('books', key: 'uuid', database: 'reports')]` names another key column and a configured database. Table, pivot and key names are identifiers, not SQL. A model without a key can be read, but cannot be found by key, saved, deleted, refreshed or queried through `related()`.
+`#[Table('books', key: 'uuid', database: 'reports')]` names the table, another key column and a configured database; each part is optional. Table, pivot and key names are identifiers, not SQL. A model without a key can be read, but cannot be found by key, saved, deleted, refreshed or queried through `related()`.
 
 ## Reading
 
@@ -102,7 +112,7 @@ $withoutBooks = Author::query()->whereDoesntHave('books')->get();
 $grouped = Book::query()->where(static fn (ModelQuery $query): ModelQuery => $query->whereHas('author')->orWhere('title', 'PHP'))->get();
 ```
 
-`HasOne` declares a nullable or required model property. `HasMany` declares an array and names its related class. `BelongsToMany` names that class, the pivot table, and its two foreign-key columns. `BelongsTo` takes a foreign-key column on this model and an optional owner-key column; `HasOne` and `HasMany` take a related foreign-key column and an optional local-key column. Omitted owner and local keys use the model's key.
+A property that is another model belongs to it with no attribute. `HasOne` declares a nullable or required model property. `HasMany` declares an array and names its related class, as `BelongsToMany` does. Each takes the names it would otherwise assume: `BelongsTo` a foreign-key column on this model and an optional owner-key column; `HasOne` and `HasMany` a related foreign-key column and an optional local-key column; `BelongsToMany` the pivot table and its two foreign-key columns. Omitted owner and local keys use the model's key.
 
 A dotted path such as `books.author` loads through relations. A closure after a path constrains its last part. Loading uses one query per relation, or one per batch of 1,000 distinct keys. Related objects are shared within that load, and loading again replaces the property. Missing single rows become null only on nullable properties; many relations become empty arrays. With `with()` and `load()`, lists default to ascending related key order, and `HasOne` takes the first row in that order. `HasOne` and `BelongsTo` hydrate only the winning row for each parent key; the database still sends all matching rows. A `related()` query has only the order you give it: `related('one')->first()` without an order may return any matching row.
 
@@ -112,7 +122,7 @@ A limit or offset in an eager constraint is refused; use `related()` for one mod
 
 ## Writing
 
-Make a model with `new`, then save it. Later saves write only changed columns. Columns filled by database defaults remain uninitialized until you refresh:
+Make a model with `new`, then save it. Later saves write only changed columns:
 
 ```php
 // writing.php
@@ -128,7 +138,9 @@ $book->delete();
 $book->save();
 ```
 
-Declare a column the database fills, such as `created_at` with a default of the current time, without a default of its own: `public ?\DateTimeImmutable $created_at;`. Written `= null`, the property has a value, and the insert writes null in place of the database's default.
+A model that declares `created_at` and `updated_at` as dates has them kept: both when it is first saved, and `updated_at` at each change, bulk `update()`, `increment()` and `decrement()` included. A time you set yourself is written as you set it, and a save that changes nothing writes nothing. The time is the application's clock, to the second.
+
+A null property is left out of the insert, so the database gives the column its default, or null when it has none. The model learns what the database filled when you `refresh()` it. On a stored model null is a value like any other, and assigning it writes null.
 
 Changing a foreign key and saving unsets its loaded `BelongsTo` property. Assigning a relation itself changes no foreign key. Arrays and scalars compare strictly, dates by their instant, and cast objects by their written value, including mutations inside them. Mutable `DateTime` values held by `DateTimeInterface` or `mixed` columns are snapshotted as immutable copies, so in-place date changes are detected. A failed statement leaves the snapshot untouched so you can correct the model and save again.
 
@@ -152,7 +164,11 @@ $database->transaction(static function (): void {
 
 A query also retains its original database. Before executing or loading relations, a captured connection that is not the database itself must still be that database's `current()` connection. Otherwise Tide throws `LogicException`: its `run()` or transaction has ended, or another loan is innermost. Start the query where it runs. A query started outside any loan keeps using the pool, even when run inside a transaction.
 
-A nested transaction on the callback's connection uses a savepoint. A nested call on the database borrows another connection, with its own transaction; SQLite permits only one writer per file. Fibers started inside a callback do not inherit its loan. Discard models written in a transaction that rolled back: the objects still remember the successful statements.
+A nested transaction on the callback's connection uses a savepoint. A nested call on the database borrows another connection, with its own transaction; SQLite permits only one writer per file. Fibers started inside a callback do not inherit its loan.
+
+Only model calls follow the transaction. A query builder call on the database itself, `$database->table(...)`, still borrows another connection and runs outside it; inside a transaction use the connection the callback is given, or `$database->current()`.
+
+When a transaction is rolled back, the models saved or deleted in it are again what the database holds: a new model is new, with its generated key emptied, and a stored one has the values it had. So the same callback can be run again, after a deadlock for one, and writes them again. The properties keep what you assigned.
 
 ## JSON and limits
 
@@ -163,6 +179,6 @@ $json = json_encode(Book::query()->with('author')->find(1), JSON_THROW_ON_ERROR)
 
 JSON includes initialized columns and loaded relations in declaration order, without `#[Hidden]` properties. Hidden getters and unmapped virtual getters are never evaluated; no public property name is reserved. Dates use ATOM text; enums, arrays and nested models are handled by `json_encode()`. Avoid serializing a cycle of loaded relations.
 
-Tide does not infer names, load on property access, maintain an identity map, validate input, fill timestamps, soft-delete, fire model events or provide collections, polymorphic relations or composite keys. Models belong to one request; give a job an id and read the row in the job.
+Tide does not load on property access, maintain an identity map, validate input, soft-delete, fire model events or provide collections, polymorphic relations or composite keys. Models belong to one request; give a job an id and read the row in the job.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for checks and [BENCHMARKS.md](BENCHMARKS.md) for measured reading costs.

@@ -19,7 +19,7 @@ final class ReadmeTest extends DatabaseTestCase
         $database->execute('drop table if exists authors');
         $database->execute('create table authors (id ' . $id . ', name varchar(100) not null)');
         $database->execute(
-            "create table books (id {$id}, title varchar(100) not null, author_id integer null, internal_note varchar(100) not null default 'hidden')",
+            "create table books (id {$id}, title varchar(100) not null, author_id integer null, internal_note varchar(100) not null default 'hidden', created_at datetime null, updated_at datetime null)",
         );
         $database->table('authors')->insert(['id' => 1, 'name' => 'First']);
         $database->table('books')->insert(['id' => 1, 'title' => 'PHP', 'author_id' => 1]);
