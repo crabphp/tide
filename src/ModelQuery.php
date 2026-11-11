@@ -6,6 +6,8 @@ namespace Crab\Tide;
 
 use Crab\Contracts\Database\Connection;
 use Crab\Contracts\Database\CursorPage;
+use Crab\Contracts\Database\Database;
+use Crab\Contracts\Database\Field;
 use Crab\Contracts\Database\Page;
 use Crab\Contracts\Database\Query;
 
@@ -19,6 +21,12 @@ final class ModelQuery
     private Query $query;
     private ?Query $conditions = null;
     private array $relations = [];
+    /**
+     * @var array<string, true> Tables reached by relation predicates, including nested ones.
+     */
+    private array $relationTables = [];
+    private ?\Closure $scope = null;
+    public readonly Connection $connection;
     private bool $ordered = false;
     private bool $windowed = false;
     public readonly string $qualifier;
@@ -28,11 +36,13 @@ final class ModelQuery
      */
     public function __construct(
         public readonly ModelMap $map,
-        public readonly Connection $connection,
+        public readonly Database $database,
+        ?Connection $connection = null,
         ?string $alias = null,
     ) {
+        $this->connection = $connection ?? $database->current();
         $this->qualifier = $alias ?? $map->table;
-        $this->query = $connection->table($map->table, $alias);
+        $this->query = $this->connection->table($map->table, $alias);
         $this->query->select(...array_map(
             fn(string $column): string => $this->qualifier . '.' . $column,
             array_keys($map->columns),
@@ -56,6 +66,7 @@ final class ModelQuery
 
     public function tap(\Closure $callback): static
     {
+        $this->assertCurrent();
         $callback($this->query);
         return $this;
     }
@@ -68,13 +79,13 @@ final class ModelQuery
 
     public function whereHas(string $relation, ?\Closure $constraint = null): static
     {
-        ($this->conditions ?? $this->query)->whereExists(Relations::exists($this, $relation, $constraint));
+        $this->condition('whereExists', [Relations::exists($this, $relation, $constraint)]);
         return $this;
     }
 
     public function whereDoesntHave(string $relation, ?\Closure $constraint = null): static
     {
-        ($this->conditions ?? $this->query)->whereNotExists(Relations::exists($this, $relation, $constraint));
+        $this->condition('whereNotExists', [Relations::exists($this, $relation, $constraint)]);
         return $this;
     }
 
@@ -83,6 +94,7 @@ final class ModelQuery
      */
     public function builder(): Query
     {
+        $this->assertCurrent();
         return $this->query;
     }
 
@@ -107,15 +119,7 @@ final class ModelQuery
      */
     public function constrain(\Closure $constraint): void
     {
-        $this->query->where(function (Query $conditions) use ($constraint): void {
-            $previous = $this->conditions;
-            $this->conditions = $conditions;
-            try {
-                $constraint($this);
-            } finally {
-                $this->conditions = $previous;
-            }
-        });
+        $this->where($constraint);
     }
 
     /**
@@ -124,7 +128,8 @@ final class ModelQuery
      */
     public function loadRelations(array $models): void
     {
-        Relations::load($this->map, $this->connection, $models, $this->relations);
+        $this->assertCurrent();
+        Relations::load($this, $models, $this->relations);
     }
 
     /**
@@ -132,6 +137,7 @@ final class ModelQuery
      */
     public function get(): array
     {
+        $this->assertCurrent();
         return $this->models($this->query->get());
     }
 
@@ -140,6 +146,7 @@ final class ModelQuery
      */
     public function first(): ?Model
     {
+        $this->assertCurrent();
         $row = $this->query->first();
         return $row === null ? null : $this->models([$row])[0];
     }
@@ -149,6 +156,7 @@ final class ModelQuery
      */
     public function find(int|string $id): ?Model
     {
+        $this->assertCurrent();
         $key = $this->map->requireKey();
         $row = $this->query->find($id, $this->qualifier . '.' . $key->column);
         return $row === null ? null : $this->models([$row])[0];
@@ -156,6 +164,7 @@ final class ModelQuery
 
     public function paginate(int $perPage = 15, int $page = 1): Page
     {
+        $this->assertCurrent();
         $result = $this->query->paginate($perPage, $page);
         return new Page(
             $this->models($result->items),
@@ -168,6 +177,7 @@ final class ModelQuery
 
     public function simplePaginate(int $perPage = 15, int $page = 1): Page
     {
+        $this->assertCurrent();
         $result = $this->query->simplePaginate($perPage, $page);
         return new Page(
             $this->models($result->items),
@@ -178,14 +188,16 @@ final class ModelQuery
         );
     }
 
-    public function cursorPaginate(int $perPage = 15, ?string $cursor = null, string $unique = 'id'): CursorPage
+    public function cursorPaginate(int $perPage = 15, ?string $cursor = null, ?string $unique = null): CursorPage
     {
-        $result = $this->query->cursorPaginate($perPage, $cursor, $unique);
+        $this->assertCurrent();
+        $result = $this->query->cursorPaginate($perPage, $cursor, $unique ?? $this->map->requireKey()->column);
         return new CursorPage($this->models($result->items), $result->perPage, $result->nextCursor);
     }
 
     public function chunkById(int $size, \Closure $callback, string $column = 'id'): void
     {
+        $this->assertCurrent();
         if (func_num_args() < 3) {
             $column = $this->map->requireKey()->column;
         }
@@ -194,13 +206,8 @@ final class ModelQuery
 
     public function update(array $values): int
     {
-        foreach ($values as $column => $value) {
-            if (!isset($this->map->columns[$column])) {
-                continue;
-            }
-            $values[$column] = $this->map->columns[$column]->toColumn($value);
-        }
-        return $this->query->update($values);
+        $this->assertWritable();
+        return $this->query->update($this->written($values));
     }
 
     /**
@@ -216,97 +223,99 @@ final class ModelQuery
 
     public function where(string|array|\Closure $column, mixed $operator = null, mixed $value = null): static
     {
-        ($this->conditions ?? $this->query)->where(...func_get_args());
+        $arguments = $column instanceof \Closure ? [$this->group($column)] : func_get_args();
+        $this->condition('where', $arguments);
         return $this;
     }
 
     public function orWhere(string|array|\Closure $column, mixed $operator = null, mixed $value = null): static
     {
-        ($this->conditions ?? $this->query)->orWhere(...func_get_args());
+        $arguments = $column instanceof \Closure ? [$this->group($column)] : func_get_args();
+        $this->condition('orWhere', $arguments);
         return $this;
     }
 
     public function whereIn(string $column, array|Query $values): static
     {
-        ($this->conditions ?? $this->query)->whereIn($column, $values);
+        $this->condition('whereIn', [$column, $values]);
         return $this;
     }
 
     public function orWhereIn(string $column, array|Query $values): static
     {
-        ($this->conditions ?? $this->query)->orWhereIn($column, $values);
+        $this->condition('orWhereIn', [$column, $values]);
         return $this;
     }
 
     public function whereNotIn(string $column, array|Query $values): static
     {
-        ($this->conditions ?? $this->query)->whereNotIn($column, $values);
+        $this->condition('whereNotIn', [$column, $values]);
         return $this;
     }
 
     public function orWhereNotIn(string $column, array|Query $values): static
     {
-        ($this->conditions ?? $this->query)->orWhereNotIn($column, $values);
+        $this->condition('orWhereNotIn', [$column, $values]);
         return $this;
     }
 
     public function whereNull(string $column): static
     {
-        ($this->conditions ?? $this->query)->whereNull($column);
+        $this->condition('whereNull', [$column]);
         return $this;
     }
 
     public function orWhereNull(string $column): static
     {
-        ($this->conditions ?? $this->query)->orWhereNull($column);
+        $this->condition('orWhereNull', [$column]);
         return $this;
     }
 
     public function whereNotNull(string $column): static
     {
-        ($this->conditions ?? $this->query)->whereNotNull($column);
+        $this->condition('whereNotNull', [$column]);
         return $this;
     }
 
     public function orWhereNotNull(string $column): static
     {
-        ($this->conditions ?? $this->query)->orWhereNotNull($column);
+        $this->condition('orWhereNotNull', [$column]);
         return $this;
     }
 
     public function whereBetween(string $column, mixed $from, mixed $to): static
     {
-        ($this->conditions ?? $this->query)->whereBetween($column, $from, $to);
+        $this->condition('whereBetween', [$column, $from, $to]);
         return $this;
     }
 
     public function orWhereBetween(string $column, mixed $from, mixed $to): static
     {
-        ($this->conditions ?? $this->query)->orWhereBetween($column, $from, $to);
+        $this->condition('orWhereBetween', [$column, $from, $to]);
         return $this;
     }
 
     public function whereNotBetween(string $column, mixed $from, mixed $to): static
     {
-        ($this->conditions ?? $this->query)->whereNotBetween($column, $from, $to);
+        $this->condition('whereNotBetween', [$column, $from, $to]);
         return $this;
     }
 
     public function orWhereNotBetween(string $column, mixed $from, mixed $to): static
     {
-        ($this->conditions ?? $this->query)->orWhereNotBetween($column, $from, $to);
+        $this->condition('orWhereNotBetween', [$column, $from, $to]);
         return $this;
     }
 
     public function whereColumn(string $first, string $operator, ?string $second = null): static
     {
-        ($this->conditions ?? $this->query)->whereColumn($first, $operator, $second);
+        $this->condition('whereColumn', [$first, $operator, $second]);
         return $this;
     }
 
     public function orWhereColumn(string $first, string $operator, ?string $second = null): static
     {
-        ($this->conditions ?? $this->query)->orWhereColumn($first, $operator, $second);
+        $this->condition('orWhereColumn', [$first, $operator, $second]);
         return $this;
     }
 
@@ -377,56 +386,158 @@ final class ModelQuery
 
     public function exists(): bool
     {
+        $this->assertCurrent();
         return $this->query->exists();
     }
 
     public function count(string $column = '*'): int
     {
+        $this->assertCurrent();
         return $this->query->count($column);
     }
 
     public function sum(string $column): int|float
     {
+        $this->assertCurrent();
         return $this->query->sum($column);
     }
 
     public function avg(string $column): ?float
     {
+        $this->assertCurrent();
         return $this->query->avg($column);
     }
 
     public function min(string $column): mixed
     {
+        $this->assertCurrent();
         return $this->query->min($column);
     }
 
     public function max(string $column): mixed
     {
+        $this->assertCurrent();
         return $this->query->max($column);
     }
 
     public function pluck(string $column, ?string $key = null): array
     {
+        $this->assertCurrent();
         return $this->query->pluck($column, $key);
     }
 
     public function value(string $column): mixed
     {
+        $this->assertCurrent();
         return $this->query->value($column);
     }
 
     public function increment(string $column, int|float $amount = 1, array $extra = []): int
     {
-        return $this->query->increment($column, $amount, $extra);
+        $this->assertWritable();
+        $this->column($column);
+        return $this->query->increment($column, $amount, $this->written($extra));
     }
 
     public function decrement(string $column, int|float $amount = 1, array $extra = []): int
     {
-        return $this->query->decrement($column, $amount, $extra);
+        $this->assertWritable();
+        $this->column($column);
+        return $this->query->decrement($column, $amount, $this->written($extra));
     }
 
     public function delete(): int
     {
+        $this->assertWritable();
         return $this->query->delete();
+    }
+
+    /**
+     * @internal A captured loan is usable only while it is current for its original database.
+     */
+    public function assertCurrent(): void
+    {
+        if ($this->connection !== $this->database && $this->connection !== $this->database->current()) {
+            throw new \LogicException(
+                "{$this->map->class} query was started inside a transaction or run() that has ended or is not the innermost one now; start the query where it runs.",
+            );
+        }
+    }
+
+    /**
+     * @internal Keep the parent predicate in every top-level OR branch.
+     */
+    public function scope(string $column, int|string|null $key): void
+    {
+        $this->scope = static fn(Query $query): Query => (
+            $key === null ? $query->whereIn($column, []) : $query->where($column, $key)
+        );
+        ($this->scope)($this->query);
+    }
+
+    /**
+     * @internal Propagate tables reached through a relation's path and its constraints.
+     */
+    public function includeRelation(self $related, ?string $pivot = null): void
+    {
+        $this->relationTables[$related->map->table] = true;
+        $this->relationTables += $related->relationTables;
+        if ($pivot !== null) {
+            $this->relationTables[$pivot] = true;
+        }
+    }
+
+    private function group(\Closure $constraint): \Closure
+    {
+        return function (Query $conditions) use ($constraint): void {
+            $previous = $this->conditions;
+            $this->conditions = $conditions;
+            try {
+                $constraint($this);
+            } finally {
+                $this->conditions = $previous;
+            }
+        };
+    }
+
+    private function condition(string $method, array $arguments): void
+    {
+        if ($this->scope !== null && $this->conditions === null && str_starts_with($method, 'orWhere')) {
+            $scope = $this->scope;
+            // (parent AND a) OR (parent AND b) keeps the parent outside the user's OR.
+            $this->query->orWhere(static function (Query $branch) use ($scope, $method, $arguments): void {
+                $scope($branch);
+                $branch->where(static fn(Query $group): Query => $group->{$method}(...$arguments));
+            });
+            return;
+        }
+        ($this->conditions ?? $this->query)->{$method}(...$arguments);
+    }
+
+    private function assertWritable(): void
+    {
+        $this->assertCurrent();
+        if (isset($this->relationTables[$this->map->table])) {
+            throw new \LogicException(
+                "{$this->map->class} has a relation condition reaching its own table; read the keys first and write with whereIn() instead of a bulk write with whereHas() or whereDoesntHave().",
+            );
+        }
+    }
+
+    private function column(string $column): Field
+    {
+        return (
+            $this->map->columns[$column] ?? throw new \LogicException(
+                "{$this->map->class} does not declare the column \"{$column}\"; use the query builder to write a column the model does not declare.",
+            )
+        );
+    }
+
+    private function written(array $values): array
+    {
+        foreach ($values as $column => $value) {
+            $values[$column] = $this->column($column)->toColumn($value);
+        }
+        return $values;
     }
 }

@@ -235,7 +235,7 @@ final class SaveTest extends DatabaseTestCase
     }
 
     #[DataProvider('drivers')]
-    public function testBackedGettersUseThePropertyValueInTheSnapshotAndRefreshBypassesSetters(string $driver): void
+    public function testBackedGettersNeverTransformStoredValuesAndRefreshBypassesSetters(string $driver): void
     {
         $this->start($driver);
         $this->db->table('tide_authors')->where('id', 1)->update(['name' => 'mixed']);
@@ -248,7 +248,7 @@ final class SaveTest extends DatabaseTestCase
         $author->name = ' assigned ';
         self::assertSame('ASSIGNED', $author->name);
         $author->save();
-        self::assertSame('ASSIGNED', $this->db->table('tide_authors')->where('id', 1)->value('name'));
+        self::assertSame('assigned', $this->db->table('tide_authors')->where('id', 1)->value('name'));
         $this->db->table('tide_authors')->where('id', 1)->update(['name' => ' raw ']);
         $author->refresh();
         self::assertSame(' RAW ', $author->name);

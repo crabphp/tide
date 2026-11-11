@@ -53,8 +53,9 @@ final class RelationEdgeTest extends DatabaseTestCase
                 $tx->table('tide_book_tag')->insert(['book_id' => $id, 'tag_id' => 1]);
             }
         });
-        $connection = $this->recording();
-        $books = new ModelQuery(ModelMap::of(Book::class), $connection)
+        $recording = new \Crab\Tide\Tests\Support\RecordingDatabase($this->db);
+        $connection = $recording->recording;
+        $books = new ModelQuery(ModelMap::of(Book::class), $recording)
             ->with('tags.books')
             ->orderBy('id')
             ->get();

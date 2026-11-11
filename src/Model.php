@@ -17,7 +17,7 @@ abstract class Model implements \JsonSerializable
     public static function query(): ModelQuery
     {
         $map = ModelMap::of(static::class);
-        return new ModelQuery($map, Tide::database($map->database)->current());
+        return new ModelQuery($map, Tide::database($map->database));
     }
 
     public static function find(int|string $id): ?static
@@ -44,7 +44,8 @@ abstract class Model implements \JsonSerializable
                 . '::load() received a new model; save it before loading relations.');
             }
         }
-        Relations::load($map, Tide::database($map->database)->current(), $models, Relations::tree($map, $relations));
+        $query = new ModelQuery($map, Tide::database($map->database));
+        Relations::load($query, $models, Relations::tree($map, $relations));
     }
 
     public function save(): static
@@ -146,7 +147,7 @@ abstract class Model implements \JsonSerializable
         if ($fresh === null) {
             throw new RowGone(static::class . '::refresh() found no row; discard this model and read an existing row.');
         }
-        $values = get_mangled_object_vars($fresh);
+        $values = $map->values($fresh);
         foreach ($map->fields as $name => $_) {
             $map->assign($this, $name, $values[$name]);
         }
@@ -169,19 +170,14 @@ abstract class Model implements \JsonSerializable
         if (!$this->stored()) {
             throw new \LogicException(static::class . '::related() needs a stored model; save it first.');
         }
-        return Relations::query($map, Tide::database($map->database)->current(), $this, $map->relation($relation));
+        return Relations::query(new ModelQuery($map, Tide::database($map->database)), $this, $map->relation($relation));
     }
 
     public function jsonSerialize(): array
     {
         $map = ModelMap::of(static::class);
-        $values = get_object_vars($this);
         $json = [];
-        foreach ($map->properties as $name) {
-            if (isset($map->hidden[$name]) || !array_key_exists($name, $values)) {
-                continue;
-            }
-            $value = $values[$name];
+        foreach ($map->visibleValues($this) as $name => $value) {
             $json[$name] = $value instanceof \DateTimeInterface ? $value->format(\DateTimeInterface::ATOM) : $value;
         }
         return $json;

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Crab\Tide;
 
-use Crab\Contracts\Database\Connection;
 use Crab\Contracts\Database\Query;
 
 /**
@@ -63,16 +62,17 @@ final class Relations
      * @param list<Model> $models
      * @param array<string, array{constraints: list<\Closure>, nested: array}> $tree
      */
-    public static function load(ModelMap $map, Connection $connection, array $models, array $tree): void
+    public static function load(ModelQuery $parent, array $models, array $tree): void
     {
         if ($models === []) {
             return;
         }
+        $parent->assertCurrent();
+        $map = $parent->map;
         foreach ($tree as $name => $node) {
             $relation = $map->relation($name);
             [$related, $local, $foreign] = $relation->keys($map);
-            $relatedConnection = self::connection($map, $related, $connection);
-            $query = new ModelQuery($related, $relatedConnection);
+            $query = self::relatedQuery($parent, $related);
             foreach ($node['constraints'] as $constraint) {
                 $query->constrain($constraint);
             }
@@ -82,7 +82,7 @@ final class Relations
             $keys = [];
             $parentKeys = [];
             foreach ($models as $index => $model) {
-                $key = self::value($model, $local->property, $relation);
+                $key = self::value($map, $model, $local->property, $relation);
                 $parentKeys[$index] = $key;
                 if ($key !== null) {
                     $keys[$key] = $key;
@@ -91,6 +91,7 @@ final class Relations
             $groups = [];
             $objects = [];
             $manyToMany = $relation->attribute instanceof BelongsToMany;
+            $single = $relation->attribute instanceof HasOne || $relation->attribute instanceof BelongsTo;
             $pivotAlias = 'tide_pivot';
             while (isset($related->columns[$pivotAlias])) {
                 $pivotAlias .= '_';
@@ -108,11 +109,16 @@ final class Relations
                 $batch = clone $query;
                 $batch->whereIn($match, $part);
                 foreach ($batch->builder()->get() as $row) {
+                    $group = $manyToMany
+                        ? $local->fromColumn($row[$pivotAlias])
+                        : $foreign->fromColumn($row[$foreign->column]);
+                    if ($single && isset($groups[$group])) {
+                        continue;
+                    }
                     $identity = $related->key === null ? null : $related->key->fromColumn($row[$related->key->column]);
                     $model = $identity === null
                         ? $related->hydrate($row)
                         : ($objects[$identity] ??= $related->hydrate($row));
-                    $group = $manyToMany ? $local->fromColumn($row[$pivotAlias]) : $model->{$foreign->property};
                     $groups[$group][] = $model;
                     if ($identity === null) {
                         $objects[] = $model;
@@ -142,22 +148,23 @@ final class Relations
                 }
             }
             $query->loadRelations(array_values($loaded));
-            self::load($related, $relatedConnection, array_values($loaded), $node['nested']);
+            self::load($query, array_values($loaded), $node['nested']);
         }
     }
 
-    public static function query(ModelMap $parent, Connection $connection, Model $model, Relation $relation): ModelQuery
+    public static function query(ModelQuery $parent, Model $model, Relation $relation): ModelQuery
     {
-        [$related, $local, $foreign] = $relation->keys($parent);
-        $query = new ModelQuery($related, self::connection($parent, $related, $connection));
-        $key = self::value($model, $local->property, $relation);
+        [$related, $local, $foreign] = $relation->keys($parent->map);
+        $query = self::relatedQuery($parent, $related);
+        $key = self::value($parent->map, $model, $local->property, $relation);
         if ($relation->attribute instanceof BelongsToMany) {
             self::pivot($query, $relation, $foreign->column);
             $match = $relation->attribute->pivot . '.' . $relation->attribute->key;
         } else {
             $match = $related->table . '.' . $foreign->column;
         }
-        return $key === null ? $query->whereIn($match, []) : $query->where($match, $key);
+        $query->scope($match, $key);
+        return $query;
     }
 
     public static function exists(
@@ -182,7 +189,7 @@ final class Relations
                 $alias = 'tide_related_' . $depth++;
             } while (in_array($alias, $ancestors, true));
         }
-        $query = new ModelQuery($related, $parent->connection, $alias);
+        $query = new ModelQuery($related, $parent->database, $parent->connection, $alias);
         if ($rest === null && $constraint !== null) {
             $query->constrain($constraint);
         }
@@ -196,6 +203,10 @@ final class Relations
         if ($rest !== null) {
             $query->builder()->whereExists(self::exists($query, $rest, $constraint, $depth + 1, $ancestors));
         }
+        $parent->includeRelation(
+            $query,
+            $relation->attribute instanceof BelongsToMany ? $relation->attribute->pivot : null,
+        );
         return $query->builder();
     }
 
@@ -210,20 +221,23 @@ final class Relations
         );
     }
 
-    private static function connection(ModelMap $parent, ModelMap $related, Connection $connection): Connection
+    private static function relatedQuery(ModelQuery $parent, ModelMap $related): ModelQuery
     {
-        return $parent->database === $related->database ? $connection : Tide::database($related->database)->current();
+        $parent->assertCurrent();
+        if ($parent->map->database === $related->database) {
+            return new ModelQuery($related, $parent->database, $parent->connection);
+        }
+        return new ModelQuery($related, Tide::database($related->database));
     }
 
-    private static function value(Model $model, string $property, Relation $relation): int|string|null
+    private static function value(ModelMap $map, Model $model, string $property, Relation $relation): int|string|null
     {
-        $values = get_object_vars($model);
-        if (!array_key_exists($property, $values)) {
+        if (!$map->initialized($model, $property)) {
             throw new \LogicException(
                 "{$relation->where} needs the uninitialized property \${$property}; refresh() the model before loading the relation.",
             );
         }
-        return $values[$property];
+        return $map->value($model, $property);
     }
 
     private static function validate(ModelMap $map, array $tree): void

@@ -11,22 +11,30 @@ use Crab\Contracts\Database\Query;
 final class RecordingDatabase implements Database
 {
     public readonly RecordingConnection $recording;
+    /**
+     * @var \WeakMap<Connection, RecordingConnection>
+     */
+    private \WeakMap $loans;
 
     public function __construct(
         private Database $database,
     ) {
         $this->recording = new RecordingConnection($database);
+        $this->loans = new \WeakMap();
     }
 
     public function current(): Connection
     {
         $current = $this->database->current();
         if ($current === $this->database) {
-            return $this->recording;
+            return $this;
+        }
+        if (isset($this->loans[$current])) {
+            return $this->loans[$current];
         }
         $recording = new RecordingConnection($current);
         $recording->statements = &$this->recording->statements;
-        return $recording;
+        return $this->loans[$current] = $recording;
     }
 
     public function connection(string $name): Database

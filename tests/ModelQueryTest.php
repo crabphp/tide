@@ -66,6 +66,7 @@ final class ModelQueryTest extends DatabaseTestCase
         self::assertSame(3, $last->items[0]->id);
         self::assertNull($last->nextCursor);
         $chunks = [];
+        $query = Book::query()->with('author');
         $query->chunkById(2, static function (array $models) use (&$chunks): void {
             $chunks[] = array_map(static fn(Book $book): array => [$book->id, $book->author?->name], $models);
         });

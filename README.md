@@ -67,13 +67,13 @@ final class Book extends Model
 }
 ```
 
-Public, backed properties are columns; private, protected, static and virtual properties are not. Columns accept the framework's record types and casts, including backed enums, `DateTimeImmutable`, `#[Json]` arrays and custom `Cast` attributes. `#[ColumnName('created_at')]` maps another column name. Hydration bypasses a column's set hook; application assignments still run it. Columns and relations must be writable.
+Public, backed properties are columns; private, protected, static and virtual properties are not. Columns accept the framework's record types and casts, including backed enums, `DateTimeImmutable`, `#[Json]` arrays and custom `Cast` attributes. `#[ColumnName('created_at')]` maps another column name. Persistence reads and writes raw column values without running hooks, including stored keys and relation matching. Application reads and writes still run their hooks, and JSON uses the getter's view. Columns with `public private(set)` or `public protected(set)` are supported; readonly columns are refused. Relations must be plain public properties without hooks or asymmetric setter visibility.
 
 `#[Table('books', key: 'uuid', database: 'reports')]` names another key column and a configured database. Table, pivot and key names are identifiers, not SQL. A model without a key can be read, but cannot be found by key, saved, deleted, refreshed or queried through `related()`.
 
 ## Reading
 
-Conditions and ordering use the query builder's parameters. A query returns a PHP list of models, and `first()` or `find()` returns a model or null:
+Conditions and ordering use the query builder's parameters, except that a closure given to `where()` or `orWhere()` receives a `ModelQuery`, with its conditions grouped. It can combine `whereHas()`, `whereDoesntHave()` and ordinary conditions. Builder grouping through `tap()` still receives the framework's `Query`. A query returns a PHP list of models, and `first()` or `find()` returns a model or null:
 
 ```php
 // reading.php
@@ -83,7 +83,7 @@ $page = Book::query()->orderBy('id')->paginate(20);
 $names = Author::query()->orderBy('id')->pluck('name');
 ```
 
-`simplePaginate()`, `cursorPaginate()` and `chunkById()` also return models. Aggregates, `value()` and `pluck()` return plain database values. Query execution leaves the query unchanged; clone it to branch. `when()` receives the model query. `tap()` receives the framework's `Query` for operations not forwarded; a partial selection fails when it cannot make a whole model row.
+`simplePaginate()`, `cursorPaginate()` and `chunkById()` also return models. Cursor pagination and chunking default to the declared key and require one when their column is omitted. `chunkById()` reads in ascending order of that column and refuses an existing order; remove `orderBy()` before calling it. Aggregates, `value()` and `pluck()` return plain database values. Query execution leaves the query unchanged; clone it to branch. `when()` receives the model query. `tap()` receives the framework's `Query` for operations not forwarded; a partial selection fails when it cannot make a whole model row.
 
 ## Relations
 
@@ -99,11 +99,14 @@ $authors = Author::query()->with('books', static fn (ModelQuery $query): ModelQu
 $recent = Author::find(1)->related('books')->orderByDesc('id')->limit(5)->get();
 $withBooks = Author::query()->whereHas('books')->get();
 $withoutBooks = Author::query()->whereDoesntHave('books')->get();
+$grouped = Book::query()->where(static fn (ModelQuery $query): ModelQuery => $query->whereHas('author')->orWhere('title', 'PHP'))->get();
 ```
 
 `HasOne` declares a nullable or required model property. `HasMany` declares an array and names its related class. `BelongsToMany` names that class, the pivot table, and its two foreign-key columns. `BelongsTo` takes a foreign-key column on this model and an optional owner-key column; `HasOne` and `HasMany` take a related foreign-key column and an optional local-key column. Omitted owner and local keys use the model's key.
 
-A dotted path such as `books.author` loads through relations. A closure after a path constrains its last part. Loading uses one query per relation, or one per batch of 1,000 distinct keys. Related objects are shared within that load, and loading again replaces the property. Missing single rows become null only on nullable properties; many relations become empty arrays. Lists default to ascending related key order, and `HasOne` takes the first row in that order.
+A dotted path such as `books.author` loads through relations. A closure after a path constrains its last part. Loading uses one query per relation, or one per batch of 1,000 distinct keys. Related objects are shared within that load, and loading again replaces the property. Missing single rows become null only on nullable properties; many relations become empty arrays. With `with()` and `load()`, lists default to ascending related key order, and `HasOne` takes the first row in that order. `HasOne` and `BelongsTo` hydrate only the winning row for each parent key; the database still sends all matching rows. A `related()` query has only the order you give it: `related('one')->first()` without an order may return any matching row.
+
+A `related()` query keeps its parent condition permanently: later model conditions are grouped within that parent, so an `orWhere()` cannot reach another parent's rows. Order, limit and `with()` still apply to the query.
 
 A limit or offset in an eager constraint is refused; use `related()` for one model's limited query. A relation in another database reads that database's current connection, with a many-to-many pivot beside the related table. `whereHas()` and `whereDoesntHave()` cannot cross databases. `tap()` changes are not tracked for eager limit and order checks.
 
@@ -127,9 +130,11 @@ $book->save();
 
 Declare a column the database fills, such as `created_at` with a default of the current time, without a default of its own: `public ?\DateTimeImmutable $created_at;`. Written `= null`, the property has a value, and the insert writes null in place of the database's default.
 
-Changing a foreign key and saving unsets its loaded `BelongsTo` property. Assigning a relation itself changes no foreign key. Arrays and scalars compare strictly, dates by their instant, and cast objects by their written value, including mutations inside them. A failed statement leaves the snapshot untouched so you can correct the model and save again.
+Changing a foreign key and saving unsets its loaded `BelongsTo` property. Assigning a relation itself changes no foreign key. Arrays and scalars compare strictly, dates by their instant, and cast objects by their written value, including mutations inside them. Mutable `DateTime` values held by `DateTimeInterface` or `mixed` columns are snapshotted as immutable copies, so in-place date changes are detected. A failed statement leaves the snapshot untouched so you can correct the model and save again.
 
-Deletes and updates use the stored key, even if you changed the key property. Delete makes the model new again and keeps loaded relations. Refresh reads into the same object, unloads relations and throws `RowGone` if the row disappeared. Clone keeps the original snapshot and still represents the same row. Bulk `update()`, `increment()`, `decrement()` and `delete()` operate directly on the database and do not change models already held.
+Deletes and updates use the stored key, even if you changed the key property. Delete makes the model new again and keeps loaded relations. Refresh reads into the same object, unloads relations and throws `RowGone` if the row disappeared. Clone keeps the original snapshot and still represents the same row. Bulk `update()`, `increment()`, `decrement()` and `delete()` operate directly on the database and do not change models already held. Every written column must be declared by the model, including the increment/decrement column and extra values; extras use the same field conversion as `update()`. Use the query builder to write other columns.
+
+Bulk writes with `whereHas()` or `whereDoesntHave()` reaching the target model's own table, through a path or a constraint too, are refused on every driver. Read the matching keys first, then write with `whereIn()`. Reads with those relation conditions are supported.
 
 ## Transactions
 
@@ -145,6 +150,8 @@ $database->transaction(static function (): void {
 });
 ```
 
+A query also retains its original database. Before executing or loading relations, a captured connection that is not the database itself must still be that database's `current()` connection. Otherwise Tide throws `LogicException`: its `run()` or transaction has ended, or another loan is innermost. Start the query where it runs. A query started outside any loan keeps using the pool, even when run inside a transaction.
+
 A nested transaction on the callback's connection uses a savepoint. A nested call on the database borrows another connection, with its own transaction; SQLite permits only one writer per file. Fibers started inside a callback do not inherit its loan. Discard models written in a transaction that rolled back: the objects still remember the successful statements.
 
 ## JSON and limits
@@ -154,7 +161,7 @@ A nested transaction on the callback's connection uses a savepoint. A nested cal
 $json = json_encode(Book::query()->with('author')->find(1), JSON_THROW_ON_ERROR);
 ```
 
-JSON includes initialized columns and loaded relations in declaration order, without `#[Hidden]` properties. Dates use ATOM text; enums, arrays and nested models are handled by `json_encode()`. Avoid serializing a cycle of loaded relations.
+JSON includes initialized columns and loaded relations in declaration order, without `#[Hidden]` properties. Hidden getters and unmapped virtual getters are never evaluated; no public property name is reserved. Dates use ATOM text; enums, arrays and nested models are handled by `json_encode()`. Avoid serializing a cycle of loaded relations.
 
 Tide does not infer names, load on property access, maintain an identity map, validate input, fill timestamps, soft-delete, fire model events or provide collections, polymorphic relations or composite keys. Models belong to one request; give a job an id and read the row in the job.
 

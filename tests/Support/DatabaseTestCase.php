@@ -141,9 +141,4 @@ abstract class DatabaseTestCase extends TestCase
         }
         EventLoop::current()->run();
     }
-
-    protected function recording(): RecordingConnection
-    {
-        return new RecordingConnection($this->db);
-    }
 }

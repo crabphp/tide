@@ -19,8 +19,9 @@ final class RelationsTest extends DatabaseTestCase
     public function testEveryKindLoadsInOrderAndSharesRelatedObjects(string $driver): void
     {
         $this->start($driver);
-        $connection = $this->recording();
-        $books = new ModelQuery(ModelMap::of(Book::class), $connection)
+        $recording = new \Crab\Tide\Tests\Support\RecordingDatabase($this->db);
+        $connection = $recording->recording;
+        $books = new ModelQuery(ModelMap::of(Book::class), $recording)
             ->with('author', 'chapters', 'isbn', 'tags')
             ->orderBy('id')
             ->get();
@@ -41,8 +42,9 @@ final class RelationsTest extends DatabaseTestCase
     public function testNestedPathsConstraintsAndRepeatedNames(string $driver): void
     {
         $this->start($driver);
-        $connection = $this->recording();
-        $books = new ModelQuery(ModelMap::of(Book::class), $connection)
+        $recording = new \Crab\Tide\Tests\Support\RecordingDatabase($this->db);
+        $connection = $recording->recording;
+        $books = new ModelQuery(ModelMap::of(Book::class), $recording)
             ->with(
                 'chapters.notes',
                 static fn(ModelQuery $query) => $query->where('body', 'A note'),
@@ -122,8 +124,9 @@ final class RelationsTest extends DatabaseTestCase
             $message = $error->getMessage();
         }
         self::assertStringContainsString('must not be accessed before initialization', $message);
-        $connection = $this->recording();
-        $books = new ModelQuery(ModelMap::of(Book::class), $connection)
+        $recording = new \Crab\Tide\Tests\Support\RecordingDatabase($this->db);
+        $connection = $recording->recording;
+        $books = new ModelQuery(ModelMap::of(Book::class), $recording)
             ->where('id', 4)
             ->with('author')
             ->get();
@@ -151,8 +154,9 @@ final class RelationsTest extends DatabaseTestCase
                 $tx->table('tide_authors')->insert(['id' => $id, 'name' => 'Author']);
             }
         });
-        $connection = $this->recording();
-        $authors = new ModelQuery(ModelMap::of(Author::class), $connection)->with('books', 'books')->get();
+        $recording = new \Crab\Tide\Tests\Support\RecordingDatabase($this->db);
+        $connection = $recording->recording;
+        $authors = new ModelQuery(ModelMap::of(Author::class), $recording)->with('books', 'books')->get();
         self::assertCount(1_003, $authors);
         self::assertCount(3, $connection->statements);
         self::assertCount(1_000, $connection->statements[1][1]);

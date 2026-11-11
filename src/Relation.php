@@ -33,6 +33,11 @@ final readonly class Relation
         if ($property->isReadOnly()) {
             throw new \LogicException("{$where} is readonly; declare a writable relation so it can be loaded again.");
         }
+        if ($property->hasHooks() || $property->isPrivateSet() || $property->isProtectedSet()) {
+            throw new \LogicException(
+                "{$where} has hooks or restricted setter visibility; declare a plain public relation without hooks or asymmetric visibility so it can be loaded and unloaded.",
+            );
+        }
         $type = $property->getType();
         $many = $attribute instanceof HasMany || $attribute instanceof BelongsToMany;
         $typeName = $type instanceof \ReflectionNamedType ? $type->getName() : '';

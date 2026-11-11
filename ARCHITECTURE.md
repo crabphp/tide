@@ -115,7 +115,8 @@ A model is a concrete class that extends `Crab\Tide\Model` and names its table w
 | --- | --- |
 | What is a column | Every public, typed, non-static property that has no relation attribute, promoted or not |
 | What is not | A protected or private property, and a virtual property (a hook with no value of its own), which is how a computed value is written |
-| A backed property with a `set` hook | A row is read into it without running the hook |
+| A backed property with hooks | Persistence reads and writes raw values, including keys and snapshots, without running hooks. Application reads and writes run their hooks; JSON reads through getters |
+| Asymmetric setter visibility | Column properties with `public private(set)` or `public protected(set)` are assigned through cached reflection metadata |
 | The column's name | The property's name. `#[ColumnName]` gives another. Nothing is converted between snake and camel case |
 | Types | Those of a record: `int`, `float`, `string`, `bool`, a backed enum, `DateTimeImmutable`, an array with `#[Json]`, anything else with a `Cast` |
 | Refused | No type, a union type, `readonly`, `DateTime`, an array without `#[Json]`, two properties on one column. Said on first use, naming the property and what to write instead |
@@ -129,7 +130,7 @@ A model is a concrete class that extends `Crab\Tide\Model` and names its table w
 
 ### State
 
-A model keeps one thing of its own: the values it was read with, or null while it is new. That is how `save()` knows whether to insert, and what changed. The snapshot is keyed by property name and holds property values. For a cast whose value is an object it instead holds the written column value, so in-place mutation is detected. Database-filled columns left uninitialized by an insert are absent until they are read or assigned.
+A model keeps one thing of its own: the values it was read with, or null while it is new. That is how `save()` knows whether to insert, and what changed. The snapshot is keyed by property name and holds raw property values. A mutable `DateTime` is copied to `DateTimeImmutable`, including when held by a `DateTimeInterface` or `mixed` column. For a cast whose value is an object it instead holds the written column value, so in-place mutation is detected. Database-filled columns left uninitialized by an insert are absent until they are read or assigned.
 
 | Case | Rule |
 | --- | --- |
@@ -146,16 +147,19 @@ A model keeps one thing of its own: the values it was read with, or null while i
 | Case | Rule |
 | --- | --- |
 | Choosing columns, joining | Not on a model query: a model is a whole row. Use a record |
+| Grouped conditions | Closures given to `where()` and `orWhere()` receive `ModelQuery`, so ordinary and relation predicates compose. Grouping through the builder in `tap()` still receives the builder |
 | A condition on related rows | `whereHas('chapters', fn ($query) => ...)` and `whereDoesntHave()`, written as `EXISTS` |
 | Something not forwarded | `tap(fn (Query $query) => ...)` gives the builder's query. If it stops reading whole rows, reading fails and says which column is missing |
 | `update([...])` and `delete()` on a query | One statement, straight to the database. Models already read are not changed |
-| A value in a condition or an update | Conditions pass values to the drivers: enums become backing values and dates become text. An update also converts known columns through their fields |
+| A value in a condition or an update | Conditions pass values to the drivers: enums become backing values and dates become text. Every column of an update must be declared and is converted through its field; increment/decrement extras follow the same rule, and their target column must also be declared |
+| Cursor and chunk defaults | The declared key when the unique/cursor column is omitted; refused without a key. Chunking refuses an existing order |
+| Bulk writes with relation predicates | Refused before SQL when a `whereHas()` or `whereDoesntHave()` path or constraint reaches the target model's own table; read keys first and write with `whereIn()` |
 | A page or a chunk with `with()` | Relations are loaded for each page and each chunk |
 | A reusable condition | A static method on the model that takes and returns the model query, called directly or through `when()`; `tap()` receives the framework query |
 
 ## Relations
 
-A relation is a property with an attribute. The key is always written; the class is the property's type, or named in the attribute where the type is `array`.
+A relation is a plain public property with an attribute. Hooks and asymmetric setter visibility are refused when the model is mapped, so loading and unloading are supported. The key is always written; the class is the property's type, or named in the attribute where the type is `array`.
 
 ```php
 #[BelongsTo('author_id')]                                              public ?Author $author;
@@ -181,8 +185,10 @@ $author->related('books')->latest('id')->limit(5)->get();   // as a query of its
 | The same key many times | Asked for once |
 | Very many keys | Asked for 1,000 at a time |
 | Matching rows to models | By PHP array key, on `int` and `string` values: `7` and `"7"` are one key. Two keys the database's collation calls equal and PHP does not are not matched |
-| `HasOne` with several rows | The first in the requested order, the lowest key by default |
-| `HasMany` order | By the related key, unless the condition orders |
+| `HasOne` with several rows through `with()` or `load()` | The first in the requested order, the lowest key by default. Losing rows are skipped before hydration, as for `BelongsTo`; matching rows are still transferred from the database |
+| `HasMany` order through `with()` or `load()` | By the related key, unless the condition orders |
+| `related()` order | Only the order explicitly given. `related('one')->first()` without an order may return any matching row |
+| `related()` conditions | The parent condition is permanent; later model predicates are grouped within it, so OR cannot reach another parent. Order, limit and `with()` still apply |
 | A condition, `with('chapters', fn ($query) => ...)` | Allowed. A `limit` in it is refused: it would cut the whole list, not each model's. Use `related()` |
 | One related row for many models | One object, shared within that load |
 | A name that is no relation | Refused, listing the model's relations |
@@ -217,7 +223,7 @@ A model call names no connection, so there must be one place that decides it. Th
 
 `TidePlugin` gives `Tide::use()` a closure that resolves the application's `Database` on first use, keeping the resolved result; a test calls `Tide::use($database)` itself. That object is process scope: it is defined once, is safe to make anywhere, and opens its connections in each worker. A static name for a process-scope thing is what `Route` and `config()` already are.
 
-Every statement of a model then runs on `current()` of its database.
+Every statement of a model then runs on `current()` of its database. A `ModelQuery` retains both that database and the connection it started on. Before a statement or relation load, when the connection is not the database itself, it must still equal that database's `current()`; otherwise it throws `LogicException` saying to start the query where it runs. This checks the innermost current connection by identity, without a separate lease token.
 
 | Case | Rule |
 | --- | --- |
@@ -226,7 +232,8 @@ Every statement of a model then runs on `current()` of its database.
 | A transaction inside a transaction | Calling the database again borrows another connection and restores the outer loan on return. Calling the lent connection uses a savepoint on that same connection. SQLite allows one writer per file |
 | Inside `$db->run()` | On the connection it lent, and so in a transaction begun on that connection |
 | A connection taken with `acquire()` by hand | Not current. Use `run()` |
-| A query started before a transaction and run inside it | On the connection it was started on. Start the query where it runs |
+| A query started outside any loan and run inside a transaction | On the pool it started on. Start the query where it runs |
+| A query captured in a loan, run after it or while another loan is innermost | Refused unless its captured connection is still that database's current connection |
 | A task started inside a transaction | On the pool. One connection cannot run two statements at once |
 | A transaction that lost its session | Model calls fail until its callback has unwound. They never fall back to the pool |
 | Outside a fiber, in a command or a test | One place stands for the main context |
@@ -245,7 +252,7 @@ Before `save()` was built, `benchmarks/read.php` measured 1, 100 and 10,000 rows
 
 ## Tests
 
-Every row of every table above is a test. They run on SQLite and on MySQL, as the framework's database tests do. The README's examples are run by a `ReadmeTest`, as in the other packages.
+The suite covers mapping, persistence, query forwarding, relations, transactions and the reproduced review regressions. Driver-dependent cases run on SQLite and, when configured, PDO MySQL and async MySQL. These tests exercise selected scenarios and combinations; they do not establish every possible combination of the rules above. The README's examples are run by a `ReadmeTest`, as in the other packages.
 
 ## Build order
 

@@ -24,11 +24,11 @@ final class ModelMap
     /**
      * @var array<string, \ReflectionProperty>
      */
-    private readonly array $hooks;
+    private readonly array $setters;
     /**
-     * @var list<string> Backed getters are evaluated only after every column is assigned.
+     * @var array<string, \ReflectionProperty> Mapped public properties only.
      */
-    private readonly array $getters;
+    private readonly array $readers;
     /**
      * @var array<string, string>
      */
@@ -41,7 +41,8 @@ final class ModelMap
      * @param array<string, Relation> $relations
      * @param list<string> $properties
      * @param array<string, true> $hidden
-     * @param array<string, \ReflectionProperty> $hooks
+     * @param array<string, \ReflectionProperty> $setters
+     * @param array<string, \ReflectionProperty> $readers
      */
     private function __construct(
         public readonly string $class,
@@ -53,12 +54,12 @@ final class ModelMap
         public readonly array $relations,
         public readonly array $properties,
         public readonly array $hidden,
-        array $hooks,
-        array $getters,
+        array $setters,
+        array $readers,
     ) {
         $this->reflection = new \ReflectionClass($class);
-        $this->hooks = $hooks;
-        $this->getters = $getters;
+        $this->setters = $setters;
+        $this->readers = $readers;
         $this->remember = \Closure::bind(
             static function (Model $model, array $values): void {
                 $model->storedValues = $values;
@@ -113,17 +114,14 @@ final class ModelMap
             $this->assign($model, $name, $value);
             $stored[$name] = $this->snapshot($field, $value);
         }
-        foreach ($this->getters as $name) {
-            $stored[$name] = $this->snapshot($this->fields[$name], $model->{$name});
-        }
         ($this->remember)($model, $stored);
         return $model;
     }
 
     public function assign(Model $model, string $name, mixed $value): void
     {
-        if (isset($this->hooks[$name])) {
-            $this->hooks[$name]->setRawValue($model, $value);
+        if (isset($this->setters[$name])) {
+            $this->setters[$name]->setRawValue($model, $value);
         } else {
             $model->{$name} = $value;
         }
@@ -131,17 +129,54 @@ final class ModelMap
 
     public function snapshot(Field $field, mixed $value): mixed
     {
-        return $field->cast !== null && is_object($value) ? $field->toColumn($value) : $value;
+        if ($field->cast !== null && is_object($value)) {
+            return $field->toColumn($value);
+        }
+        return $value instanceof \DateTime ? \DateTimeImmutable::createFromMutable($value) : $value;
     }
 
     /**
-     * Called outside Model's scope so only initialized public columns are seen.
+     * Persistence reads only mapped, initialized columns, without evaluating hooks.
      *
      * @return array<string, mixed>
      */
     public function values(Model $model): array
     {
-        return array_intersect_key(get_object_vars($model), $this->fields);
+        $values = [];
+        foreach ($this->fields as $name => $_) {
+            if (!$this->initialized($model, $name)) {
+                continue;
+            }
+            $values[$name] = $this->value($model, $name);
+        }
+        return $values;
+    }
+
+    public function initialized(Model $model, string $name): bool
+    {
+        return $this->readers[$name]->isInitialized($model);
+    }
+
+    public function value(Model $model, string $name): mixed
+    {
+        return $this->readers[$name]->getRawValue($model);
+    }
+
+    /**
+     * The application's view, read outside Model's private scope and only after the hidden filter.
+     *
+     * @return array<string, mixed>
+     */
+    public function visibleValues(Model $model): array
+    {
+        $values = [];
+        foreach ($this->properties as $name) {
+            if (isset($this->hidden[$name]) || !$this->initialized($model, $name)) {
+                continue;
+            }
+            $values[$name] = $model->{$name};
+        }
+        return $values;
     }
 
     private static function inspect(string $class): self
@@ -158,21 +193,25 @@ final class ModelMap
             throw new \LogicException("{$class} has no table; declare #[Table('table_name')] on the model itself.");
         }
         $table = $attributes[0]->newInstance();
-        $fields = $columns = $relations = $hidden = $hooks = [];
-        $properties = $getters = [];
+        $fields = $columns = $relations = $hidden = $setters = $readers = [];
+        $properties = [];
         foreach (self::properties($reflection) as $name => $property) {
-            if ($property->isStatic() || $property->isVirtual()) {
+            if ($property->isStatic()) {
                 continue;
-            }
-            $properties[] = $name;
-            if ($property->getAttributes(Hidden::class) !== []) {
-                $hidden[$name] = true;
             }
             $relationAttributes = array_filter($property->getAttributes(), static fn(\ReflectionAttribute $attribute): bool => in_array(
                 $attribute->getName(),
                 [BelongsTo::class, HasOne::class, HasMany::class, BelongsToMany::class],
                 true,
             ));
+            if ($property->isVirtual() && $relationAttributes === []) {
+                continue;
+            }
+            $properties[] = $name;
+            $readers[$name] = $property;
+            if ($property->getAttributes(Hidden::class) !== []) {
+                $hidden[$name] = true;
+            }
             $where = "{$class}::\${$name}";
             if (count($relationAttributes) > 1) {
                 throw new \LogicException(
@@ -221,11 +260,8 @@ final class ModelMap
                 );
             }
             $fields[$name] = $columns[$column] = $field;
-            if ($property->hasHook(\PropertyHookType::Get)) {
-                $getters[] = $name;
-            }
-            if ($property->hasHook(\PropertyHookType::Set)) {
-                $hooks[$name] = $property;
+            if ($property->hasHooks() || $property->isPrivateSet() || $property->isProtectedSet()) {
+                $setters[$name] = $property;
             }
         }
         $key = $columns[$table->key] ?? null;
@@ -244,8 +280,8 @@ final class ModelMap
             $relations,
             $properties,
             $hidden,
-            $hooks,
-            $getters,
+            $setters,
+            $readers,
         );
         foreach ($relations as $relation) {
             $relation->checkLocal($map);
