@@ -13,10 +13,8 @@ final readonly class BelongsToMany
         public ?string $key = null,
         public ?string $relatedKey = null,
     ) {
-        foreach (['pivot' => $pivot, 'key' => $key, 'relatedKey' => $relatedKey] as $name => $value) {
-            if ($value !== null) {
-                Table::identifier($value, self::class . '::$' . $name);
-            }
+        foreach (array_filter(['pivot' => $pivot, 'key' => $key, 'relatedKey' => $relatedKey]) as $name => $value) {
+            Table::identifier($value, self::class . '::$' . $name);
         }
     }
 }

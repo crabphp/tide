@@ -31,7 +31,7 @@ Tide::use($database);
 
 ## Models
 
-A model extends `Model` and declares its columns as typed properties. A constructor is for making a new model; reading a row never calls it. The database supplies an integer key when you leave it uninitialized. Supply a string key yourself.
+A model extends `Model` and declares its columns as typed properties. A constructor is for making a new model; reading a row never calls it. The database supplies an integer key when you leave it uninitialized, or zero. Supply a string key yourself.
 
 ```php
 // models.php
@@ -83,7 +83,7 @@ Public, backed properties are columns; private, protected, static and virtual pr
 
 ## Reading
 
-Conditions and ordering use the query builder's parameters, except that a closure given to `where()` or `orWhere()` receives a `ModelQuery`, with its conditions grouped. It can combine `whereHas()`, `whereDoesntHave()` and ordinary conditions. Builder grouping through `tap()` still receives the framework's `Query`. A query returns a PHP list of models, and `first()` or `find()` returns a model or null:
+Conditions and ordering use the query builder's parameters, except that a closure given to `where()` or `orWhere()` receives a `ModelQuery`, with its conditions grouped. It can combine `whereHas()`, `whereDoesntHave()` and ordinary conditions. Builder grouping through `tap()` still receives the framework's `Query`. Inside such a closure the query can only be given conditions: running or cloning it there is refused, since the conditions being written are not yet part of it. A query returns a PHP list of models, and `first()` or `find()` returns a model or null:
 
 ```php
 // reading.php
@@ -116,7 +116,7 @@ A property that is another model belongs to it with no attribute. `HasOne` decla
 
 A dotted path such as `books.author` loads through relations. A closure after a path constrains its last part. Loading uses one query per relation, or one per batch of 1,000 distinct keys. Related objects are shared within that load, and loading again replaces the property. Missing single rows become null only on nullable properties; many relations become empty arrays. With `with()` and `load()`, lists default to ascending related key order, and `HasOne` takes the first row in that order. `HasOne` and `BelongsTo` hydrate only the winning row for each parent key; the database still sends all matching rows. A `related()` query has only the order you give it: `related('one')->first()` without an order may return any matching row.
 
-A `related()` query keeps its parent condition permanently: later model conditions are grouped within that parent, so an `orWhere()` cannot reach another parent's rows. Order, limit and `with()` still apply to the query.
+On a many-to-many relation, a condition or an order on a plain column name means the related model's column, whatever the pivot table calls its own. A `related()` query keeps its parent condition permanently: later model conditions are grouped within that parent, so an `orWhere()` cannot reach another parent's rows. Order, limit and `with()` still apply to the query.
 
 A limit or offset in an eager constraint is refused; use `related()` for one model's limited query. A relation in another database reads that database's current connection, with a many-to-many pivot beside the related table. `whereHas()` and `whereDoesntHave()` cannot cross databases. `tap()` changes are not tracked for eager limit and order checks.
 
@@ -178,6 +178,8 @@ $json = json_encode(Book::query()->with('author')->find(1), JSON_THROW_ON_ERROR)
 ```
 
 JSON includes initialized columns and loaded relations in declaration order, without `#[Hidden]` properties. Hidden getters and unmapped virtual getters are never evaluated; no public property name is reserved. Dates use ATOM text; enums, arrays and nested models are handled by `json_encode()`. Avoid serializing a cycle of loaded relations.
+
+A `#[Json]` array is compared as PHP compares arrays. An object placed inside one and changed in place is not seen as a change; assign the array again.
 
 Tide does not load on property access, maintain an identity map, validate input, soft-delete, fire model events or provide collections, polymorphic relations or composite keys. Models belong to one request; give a job an id and read the row in the job.
 

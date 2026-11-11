@@ -28,6 +28,8 @@ final class ModelQuery
     private ?\Closure $scope = null;
     public readonly Connection $connection;
     private bool $ordered = false;
+    private bool $qualified = false;
+    private bool $filtered = false;
     private bool $windowed = false;
     public readonly string $qualifier;
 
@@ -51,6 +53,7 @@ final class ModelQuery
 
     public function __clone(): void
     {
+        $this->assertOutsideGroup('cloned');
         $this->query = clone $this->query;
     }
 
@@ -322,28 +325,28 @@ final class ModelQuery
     public function orderBy(string $column, string $direction = 'asc'): static
     {
         $this->ordered = true;
-        $this->query->orderBy($column, $direction);
+        $this->query->orderBy($this->named($column), $direction);
         return $this;
     }
 
     public function orderByDesc(string $column): static
     {
         $this->ordered = true;
-        $this->query->orderByDesc($column);
+        $this->query->orderByDesc($this->named($column));
         return $this;
     }
 
     public function latest(string $column = 'created_at'): static
     {
         $this->ordered = true;
-        $this->query->latest($column);
+        $this->query->latest($this->named($column));
         return $this;
     }
 
     public function oldest(string $column = 'created_at'): static
     {
         $this->ordered = true;
-        $this->query->oldest($column);
+        $this->query->oldest($this->named($column));
         return $this;
     }
 
@@ -399,37 +402,37 @@ final class ModelQuery
     public function sum(string $column): int|float
     {
         $this->assertCurrent();
-        return $this->query->sum($column);
+        return $this->query->sum($this->named($column));
     }
 
     public function avg(string $column): ?float
     {
         $this->assertCurrent();
-        return $this->query->avg($column);
+        return $this->query->avg($this->named($column));
     }
 
     public function min(string $column): mixed
     {
         $this->assertCurrent();
-        return $this->query->min($column);
+        return $this->query->min($this->named($column));
     }
 
     public function max(string $column): mixed
     {
         $this->assertCurrent();
-        return $this->query->max($column);
+        return $this->query->max($this->named($column));
     }
 
     public function pluck(string $column, ?string $key = null): array
     {
         $this->assertCurrent();
-        return $this->query->pluck($column, $key);
+        return $this->query->pluck($this->named($column), $key);
     }
 
     public function value(string $column): mixed
     {
         $this->assertCurrent();
-        return $this->query->value($column);
+        return $this->query->value($this->named($column));
     }
 
     public function increment(string $column, int|float $amount = 1, array $extra = []): int
@@ -457,6 +460,7 @@ final class ModelQuery
      */
     public function assertCurrent(): void
     {
+        $this->assertOutsideGroup('run');
         if ($this->connection !== $this->database && $this->connection !== $this->database->current()) {
             throw new \LogicException(
                 "{$this->map->class} query was started inside a transaction or run() that has ended or is not the innermost one now; start the query where it runs.",
@@ -500,8 +504,59 @@ final class ModelQuery
         };
     }
 
+    /**
+     * Inside the closure of where() the conditions being written are not yet part of the query,
+     * so running or copying it there would leave them out.
+     */
+    private function assertOutsideGroup(string $what): void
+    {
+        if ($this->conditions !== null) {
+            throw new \LogicException(
+                "{$this->map->class} query cannot be {$what} inside the closure of where(), with(), whereHas() or whereDoesntHave(); add conditions there, and run the query after the closure.",
+            );
+        }
+    }
+
+    /**
+     * A model column named plainly, written with its table where the query joins another, a pivot for one,
+     * so that the pivot's own column of that name is not the one meant.
+     */
+    private function named(string $column): string
+    {
+        return $this->qualified && isset($this->map->columns[$column]) ? $this->qualifier . '.' . $column : $column;
+    }
+
+    /**
+     * @internal Says that the query joins another table, as a many-to-many relation's does.
+     */
+    public function joined(): void
+    {
+        $this->qualified = true;
+    }
+
     private function condition(string $method, array $arguments): void
     {
+        if ($this->qualified && $arguments !== []) {
+            if (is_string($arguments[0])) {
+                $arguments[0] = $this->named($arguments[0]);
+            } elseif (is_array($arguments[0]) && !array_is_list($arguments[0])) {
+                $named = [];
+                foreach ($arguments[0] as $column => $value) {
+                    $named[is_string($column) ? $this->named($column) : $column] = $value;
+                }
+                $arguments[0] = $named;
+            }
+            if ($method === 'whereColumn' || $method === 'orWhereColumn') {
+                $arguments[2] = isset($arguments[2]) ? $this->named($arguments[2]) : null;
+            }
+        }
+        if ($this->scope !== null && $this->conditions === null) {
+            // The first condition after the parent's has nothing to be an alternative to.
+            if (!$this->filtered && str_starts_with($method, 'orWhere')) {
+                $method = lcfirst(substr($method, 2));
+            }
+            $this->filtered = true;
+        }
         if ($this->scope !== null && $this->conditions === null && str_starts_with($method, 'orWhere')) {
             $scope = $this->scope;
             // (parent AND a) OR (parent AND b) keeps the parent outside the user's OR.

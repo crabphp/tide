@@ -56,6 +56,10 @@ abstract class Model implements \JsonSerializable
         $key = $map->requireKey();
         $values = $map->values($this);
         if ($this->storedValues === null) {
+            // Zero is what an int property holds before the database numbers the row; MySQL takes it as a request for a number too.
+            if (($values[$key->property] ?? null) === 0) {
+                unset($values[$key->property]);
+            }
             $givenKey = array_key_exists($key->property, $values);
             if (!$givenKey && $key->type === 'string') {
                 throw new \LogicException(
@@ -64,10 +68,11 @@ abstract class Model implements \JsonSerializable
             }
             // The times #[Timestamps] keeps, where the application gave none.
             $stamps = [];
-            foreach ([$map->createdAt, $map->updatedAt] as $stamp) {
-                if ($stamp !== null && ($values[$stamp->property] ?? null) === null) {
-                    $stamps[$stamp->property] = $values[$stamp->property] = Tide::now();
+            foreach (array_filter([$map->createdAt, $map->updatedAt]) as $stamp) {
+                if (($values[$stamp->property] ?? null) !== null) {
+                    continue;
                 }
+                $stamps[$stamp->property] = $values[$stamp->property] = Tide::now();
             }
             $written = [];
             foreach ($values as $name => $value) {

@@ -320,7 +320,7 @@ final class ReviewFixesTest extends DatabaseTestCase
             $error = $caught;
         }
         self::assertInstanceOf(\LogicException::class, $error);
-        self::assertStringContainsString('remove the orderBy()', $error->getMessage());
+        self::assertStringContainsString('remove the other orderBy()', $error->getMessage());
         self::assertSame(0, $calls);
     }
 

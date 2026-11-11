@@ -73,6 +73,10 @@ final class Relations
             $relation = $map->relation($name);
             [$related, $local, $foreign] = $relation->keys($map);
             $query = self::relatedQuery($parent, $related);
+            if ($relation->attribute instanceof BelongsToMany) {
+                // Said before the constraints are written, so that their columns are the related model's.
+                $query->joined();
+            }
             foreach ($node['constraints'] as $constraint) {
                 $query->constrain($constraint);
             }
@@ -190,6 +194,9 @@ final class Relations
             } while (in_array($alias, $ancestors, true));
         }
         $query = new ModelQuery($related, $parent->database, $parent->connection, $alias);
+        if ($relation->attribute instanceof BelongsToMany) {
+            $query->joined();
+        }
         if ($rest === null && $constraint !== null) {
             $query->constrain($constraint);
         }
@@ -213,6 +220,7 @@ final class Relations
     private static function pivot(ModelQuery $query, Relation $relation, string $column): void
     {
         $pivot = $relation->attribute;
+        $query->joined();
         $query->builder()->join(
             $pivot->pivot,
             $pivot->pivot . '.' . $pivot->relatedKey,

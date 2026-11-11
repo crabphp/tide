@@ -22,6 +22,10 @@ final class ModelMap
     private readonly \ReflectionClass $reflection;
     private readonly \Closure $remember;
     /**
+     * Whether no property of the class has a hook, so that its values can be read at once.
+     */
+    private readonly bool $plain;
+    /**
      * @var array<string, \ReflectionProperty>
      */
     private readonly array $setters;
@@ -60,6 +64,12 @@ final class ModelMap
         public readonly ?Field $updatedAt = null,
     ) {
         $this->reflection = new \ReflectionClass($class);
+        $plain = true;
+        for ($declared = $this->reflection; $declared !== false && $plain; $declared = $declared->getParentClass()) {
+            $hooked = array_filter($declared->getProperties(), static fn(\ReflectionProperty $property): bool => $property->hasHooks());
+            $plain = $hooked === [];
+        }
+        $this->plain = $plain;
         $this->setters = $setters;
         $this->readers = $readers;
         $this->remember = \Closure::bind(
@@ -159,6 +169,10 @@ final class ModelMap
      */
     public function values(Model $model): array
     {
+        if ($this->plain) {
+            // No hook anywhere on the class, so reading it whole runs none; this scope sees only public properties.
+            return array_intersect_key(get_object_vars($model), $this->fields);
+        }
         $values = [];
         foreach ($this->fields as $name => $_) {
             if (!$this->initialized($model, $name)) {
@@ -371,7 +385,11 @@ final class ModelMap
         $parent = $class->getParentClass();
         $properties = $parent === false ? [] : self::properties($parent);
         foreach ($class->getProperties(\ReflectionProperty::IS_PUBLIC) as $property) {
-            $properties[$property->getName()] = $property;
+            // Read through the class that declares it: a parent's private(set) property is the parent's to assign.
+            $declared = $property->getDeclaringClass()->getName();
+            $properties[$property->getName()] = $declared === $class->getName()
+                ? $property
+                : new \ReflectionProperty($declared, $property->getName());
         }
         return $properties;
     }

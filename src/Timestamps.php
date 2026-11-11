@@ -19,10 +19,8 @@ final readonly class Timestamps
         public ?string $created = 'created_at',
         public ?string $updated = 'updated_at',
     ) {
-        foreach ([$created, $updated] as $column) {
-            if ($column !== null) {
-                Table::identifier($column, '#[Timestamps]');
-            }
+        foreach (array_filter([$created, $updated]) as $column) {
+            Table::identifier($column, '#[Timestamps]');
         }
     }
 }
