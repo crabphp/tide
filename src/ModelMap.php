@@ -56,6 +56,8 @@ final class ModelMap
         public readonly array $hidden,
         array $setters,
         array $readers,
+        public readonly ?Field $createdAt = null,
+        public readonly ?Field $updatedAt = null,
     ) {
         $this->reflection = new \ReflectionClass($class);
         $this->setters = $setters;
@@ -282,11 +284,40 @@ final class ModelMap
             $hidden,
             $setters,
             $readers,
+            self::stamp($reflection, $columns, 'created'),
+            self::stamp($reflection, $columns, 'updated'),
         );
         foreach ($relations as $relation) {
             $relation->checkLocal($map);
         }
         return $map;
+    }
+
+    /**
+     * The column #[Timestamps] names for one of its times, on the model or a parent of it.
+     *
+     * @param array<string, Field> $columns
+     */
+    private static function stamp(\ReflectionClass $class, array $columns, string $which): ?Field
+    {
+        $attributes = [];
+        for ($declared = $class; $declared !== false && $attributes === []; $declared = $declared->getParentClass()) {
+            $attributes = $declared->getAttributes(Timestamps::class);
+        }
+        if ($attributes === []) {
+            return null;
+        }
+        $column = $attributes[0]->newInstance()->{$which};
+        if ($column === null) {
+            return null;
+        }
+        $field = $columns[$column] ?? null;
+        if ($field === null || $field->type !== Field::DATE) {
+            throw new \LogicException(
+                "{$class->getName()} has #[Timestamps] for the column \"{$column}\"; declare it as a date property, public ?\\DateTimeImmutable \${$column} = null;, or write #[Timestamps({$which}: null)] when the table has no such column.",
+            );
+        }
+        return $field;
     }
 
     /**

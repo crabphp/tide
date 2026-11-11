@@ -5,14 +5,43 @@ declare(strict_types=1);
 namespace Crab\Tide;
 
 use Crab\Contracts\Database\Database;
+use Psr\Clock\ClockInterface;
 
 final class Tide
 {
     private static Database|\Closure|null $database = null;
+    private static ClockInterface|\Closure|null $clock = null;
 
-    public static function use(Database|\Closure $database): void
+    /**
+     * The database model calls use, and the clock that #[Timestamps] reads:
+     * the application's, or closures that give them on first use. Without
+     * a clock, the time is the system's.
+     */
+    public static function use(Database|\Closure $database, ClockInterface|\Closure|null $clock = null): void
     {
         self::$database = $database;
+        self::$clock = $clock;
+    }
+
+    /**
+     * @internal The time a save is stamped with, to the second, as a column holds one.
+     */
+    public static function now(): \DateTimeImmutable
+    {
+        $clock = self::$clock;
+        if ($clock instanceof \Closure) {
+            $clock = $clock();
+            if (!$clock instanceof ClockInterface) {
+                throw new \LogicException(
+                    'Tide::use() needs a clock closure returning '
+                    . ClockInterface::class
+                    . '; return the application clock.',
+                );
+            }
+            self::$clock = $clock;
+        }
+        $now = $clock === null ? new \DateTimeImmutable() : $clock->now();
+        return $now->setTime((int) $now->format('G'), (int) $now->format('i'), (int) $now->format('s'));
     }
 
     /**

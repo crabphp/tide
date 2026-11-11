@@ -54,22 +54,36 @@ abstract class Model implements \JsonSerializable
         $key = $map->requireKey();
         $values = $map->values($this);
         if ($this->storedValues === null) {
-            if ($values === []) {
-                throw new \LogicException(static::class
-                . '::save() has no initialized column; give at least one column a value before saving.');
-            }
             $givenKey = array_key_exists($key->property, $values);
             if (!$givenKey && $key->type === 'string') {
                 throw new \LogicException(
                     static::class . "::\${$key->property} is a string key; give it a value before save().",
                 );
             }
+            // The times #[Timestamps] keeps, where the application gave none.
+            $stamps = [];
+            foreach ([$map->createdAt, $map->updatedAt] as $stamp) {
+                if ($stamp !== null && ($values[$stamp->property] ?? null) === null) {
+                    $stamps[$stamp->property] = $values[$stamp->property] = Tide::now();
+                }
+            }
             $written = [];
             foreach ($values as $name => $value) {
+                // Null is left to the database: its default for the column, or null.
+                if ($value === null) {
+                    continue;
+                }
                 $field = $map->fields[$name];
                 $written[$field->column] = $field->toColumn($value);
             }
+            if ($written === []) {
+                throw new \LogicException(static::class
+                . '::save() has no value to write; give at least one column a value before saving.');
+            }
             $id = Tide::database($map->database)->current()->table($map->table)->insert($written);
+            foreach ($stamps as $name => $value) {
+                $map->assign($this, $name, $value);
+            }
             if (!$givenKey) {
                 $id = $key->fromColumn($id);
                 $map->assign($this, $key->property, $id);
@@ -102,11 +116,23 @@ abstract class Model implements \JsonSerializable
         if ($changed === []) {
             return $this;
         }
+        $stamp = $map->updatedAt;
+        if ($stamp !== null && !array_key_exists($stamp->property, $changed)) {
+            // A change is stamped, unless the application set the time itself.
+            $now = Tide::now();
+            $written[$stamp->column] = $stamp->toColumn($now);
+            $changed[$stamp->property] = $now;
+        } else {
+            $stamp = null;
+        }
         Tide::database($map->database)
             ->current()
             ->table($map->table)
             ->where($key->column, $this->storedValues[$key->property])
             ->update($written);
+        if ($stamp !== null) {
+            $map->assign($this, $stamp->property, $changed[$stamp->property]);
+        }
         $this->storedValues = array_replace($this->storedValues, $changed);
         foreach ($map->relations as $name => $relation) {
             if (

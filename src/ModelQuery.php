@@ -533,10 +533,17 @@ final class ModelQuery
         );
     }
 
-    private function written(array $values): array
+    /**
+     * @param bool $stamped Whether a model with #[Timestamps] has its updated time written with them.
+     */
+    private function written(array $values, bool $stamped = true): array
     {
         foreach ($values as $column => $value) {
             $values[$column] = $this->column($column)->toColumn($value);
+        }
+        $stamp = $this->map->updatedAt;
+        if ($stamped && $stamp !== null && !array_key_exists($stamp->column, $values)) {
+            $values[$stamp->column] = $stamp->toColumn(Tide::now());
         }
         return $values;
     }
