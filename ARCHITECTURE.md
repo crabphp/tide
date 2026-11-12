@@ -167,13 +167,19 @@ A relation is a plain public property with an attribute. Hooks and asymmetric se
 
 ```php
 public ?Author $author;                               // belongs to: author_id, the property's name
-#[HasOne] public ?Isbn $isbn;                         // isbns.book_id, this model's name
-#[HasMany(Chapter::class)] public array $chapters;    // chapters.book_id
-#[BelongsToMany(Tag::class)] public array $tags;      // pivot book_tag, both names in alphabetical order, with book_id and tag_id
+#[HasOne]
+public ?Isbn $isbn;                                   // isbns.book_id, this model's name
+#[HasMany(Chapter::class)]
+public array $chapters;                               // chapters.book_id
+#[BelongsToMany(Tag::class)]
+public array $tags;                                   // pivot book_tag, both names in alphabetical order, with book_id and tag_id
 
-#[BelongsTo('written_by')] public ?Author $author;    // each name can be said instead
-#[HasMany(Chapter::class, 'volume_id')] public array $chapters;
-#[BelongsToMany(Tag::class, pivot: 'taggings', key: 'item_id', relatedKey: 'tag_id')] public array $tags;
+#[BelongsTo('written_by')]
+public ?Author $author;                               // each name can be said instead
+#[HasMany(Chapter::class, 'volume_id')]
+public array $chapters;
+#[BelongsToMany(Tag::class, pivot: 'taggings', key: 'item_id', relatedKey: 'tag_id')]
+public array $tags;
 ```
 
 There are three ways to reach related rows, and each is a call.

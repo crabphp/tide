@@ -41,7 +41,8 @@ final class Product extends Model
     public string $name;
     public int $price;                        // in cents
     public int $stock = 0;
-    #[Json] public ?array $details = null;    // a JSON column, decoded
+    #[Json]
+    public ?array $details = null;            // a JSON column, decoded
     public ?\DateTimeImmutable $created_at;
     public ?\DateTimeImmutable $updated_at;
 
@@ -159,12 +160,14 @@ final class Review extends Model
     public string $reviewable_type;           // 'products' or 'orders': the owner's table
     public int $reviewable_id;
 
-    #[MorphTo] public Product|Order $reviewable;
+    #[MorphTo]
+    public Product|Order $reviewable;
 }
 
 final class Product extends Model
 {
-    #[MorphMany(Review::class)] public array $reviews;
+    #[MorphMany(Review::class)]
+    public array $reviews;
 }
 
 $review->associate('reviewable', $product)->save();
@@ -176,12 +179,14 @@ Tags on products and on orders share one pivot, `taggables`, whose `taggable_typ
 ```php
 final class Product extends Model
 {
-    #[MorphToMany(Tag::class, 'taggable')] public array $tags;     // taggables: taggable_type, taggable_id, tag_id
+    #[MorphToMany(Tag::class, 'taggable')]
+    public array $tags;                       // taggables: taggable_type, taggable_id, tag_id
 }
 
 final class Tag extends Model
 {
-    #[MorphedByMany(Product::class, 'taggable')] public array $products;
+    #[MorphedByMany(Product::class, 'taggable')]
+    public array $products;
 }
 ```
 

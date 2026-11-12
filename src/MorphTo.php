@@ -9,7 +9,8 @@ namespace Crab\Tide;
  * them, the type column says which, by its morph name, and the id column which
  * row. Both columns are named after the property unless named here:
  *
- *     #[MorphTo] public Post|Video $commentable;    // commentable_type and commentable_id
+ *     #[MorphTo]
+ *     public Post|Video $commentable;    // commentable_type and commentable_id
  */
 #[\Attribute(\Attribute::TARGET_PROPERTY)]
 final readonly class MorphTo

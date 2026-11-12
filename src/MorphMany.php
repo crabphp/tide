@@ -10,7 +10,8 @@ namespace Crab\Tide;
  * the post's key. The related model's #[MorphTo] is found by the models it
  * lists; name it when there are several.
  *
- *     #[MorphMany(Comment::class)] public array $comments;
+ *     #[MorphMany(Comment::class)]
+ *     public array $comments;
  */
 #[\Attribute(\Attribute::TARGET_PROPERTY)]
 final readonly class MorphMany

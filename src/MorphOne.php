@@ -8,7 +8,8 @@ namespace Crab\Tide;
  * The one row of a model whose #[MorphTo] points here, as MorphMany for a
  * single row; the property's type is the related model:
  *
- *     #[MorphOne] public ?Image $image;
+ *     #[MorphOne]
+ *     public ?Image $image;
  */
 #[\Attribute(\Attribute::TARGET_PROPERTY)]
 final readonly class MorphOne
