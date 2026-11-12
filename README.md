@@ -83,7 +83,7 @@ Public, backed properties are columns; private, protected, static and virtual pr
 
 ## Reading
 
-A model query chooses rows of its model and returns models: conditions, `orderBy()`, `limit()`, `offset()` and `lockForUpdate()`, and relations through `with()`, `whereHas()` and `whereDoesntHave()`. A closure given to `where()` or `orWhere()` receives a `ModelQuery`, with its conditions grouped; the query cannot be run or copied inside it. `first()` and `find()` return a model or null, `get()` a list, and `exists()` and `count()` say whether and how many match:
+A model query chooses rows of its model and returns models: conditions, `orderBy()`, `limit()`, `offset()` and `lockForUpdate()`, and relations through `with()`, `whereHas()` and `whereDoesntHave()`. A closure given to `where()` or `orWhere()` receives a `ModelQuery`, with its conditions grouped; the query cannot be run or copied inside it. `first()` and `find()` return a model or null, `get()` a list, and `exists()` and `count()` say whether and how many match. `sum()`, `avg()`, `min()`, `max()`, `pluck()` and `value()` read one of the model's own columns over the matching rows, as its property holds it: `max('published_at')` is a date and `pluck('status')` a list of enums, with the query's relation conditions kept:
 
 ```php
 // reading.php
@@ -91,6 +91,7 @@ $books = Book::query()->where('title', 'like', '%PHP%')->orderBy('id')->get();
 $book = Book::find(1);
 $page = Book::query()->orderBy('id')->paginate(20);
 $count = Book::query()->where('author_id', 1)->count();
+$titles = Book::query()->whereHas('author')->orderBy('id')->pluck('title', 'id');   // [1 => 'PHP']
 ```
 
 A query reads every column the model declares, named one by one, never `*`. `select()` reads only the ones it names, and `except()` every one but those:
@@ -107,7 +108,7 @@ The other columns are left uninitialised: reading one is PHP's error, never a de
 
 ### What is the query builder's
 
-Tide maps rows and their relations and saves models: what its types can say. What they cannot is the framework's query builder's, started on the database, with an `into()` record for a typed shape: a join, an expression, a total, a raw condition or value, and writes to many rows at once.
+Tide maps rows and their relations and saves models: what its types can say. What they cannot is the framework's query builder's, started on the database, with an `into()` record for a typed shape: a join, an expression, a total of an expression, a raw condition, and writes to many rows at once.
 
 ```php
 // records.php

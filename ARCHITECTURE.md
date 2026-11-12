@@ -145,9 +145,9 @@ A model keeps one thing of its own: the values it was read with, or null while i
 
 ## Queries
 
-`Book::query()` returns a `ModelQuery<Book>`: it chooses rows of its model and returns models. It has, each as a real method, the `where` family, `whereHas()` and `whereDoesntHave()`, `orderBy`, `limit`, `offset`, `lockForUpdate` and `with()`, and ends with `get`, `first`, `find`, `exists`, `count`, `paginate`, `simplePaginate`, `cursorPaginate` and `chunkById`. `Book::find($id)` is `Book::query()->find($id)`.
+`Book::query()` returns a `ModelQuery<Book>`: it chooses rows of its model and returns models. It has, each as a real method, the `where` family, `whereHas()` and `whereDoesntHave()`, `orderBy`, `limit`, `offset`, `lockForUpdate` and `with()`, and ends with `get`, `first`, `find`, `exists`, `count`, `sum`, `avg`, `min`, `max`, `pluck`, `value`, `paginate`, `simplePaginate`, `cursorPaginate` and `chunkById`. The totals and values read only the model's own columns and give them as its properties hold them. `Book::find($id)` is `Book::query()->find($id)`.
 
-Tide does the ORM's job only: it maps rows and relations and saves models, and does what the model's types can say. What they cannot, it leaves to the query builder: a join, an expression, a total, a raw condition, a value or a list of values, and writes to many rows. Those start on the database, `$db->current()->table('books')`, with an `into()` record for a typed shape. There is no handoff from a model query to the builder.
+Tide does the ORM's job only: it maps rows and relations and saves models, and does what the model's types can say. What they cannot, it leaves to the query builder: a join, an expression, a raw condition, and writes to many rows. Those start on the database, `$db->current()->table('books')`, with an `into()` record for a typed shape. There is no handoff from a model query to the builder.
 
 | Case | Rule |
 | --- | --- |

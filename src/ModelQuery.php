@@ -7,6 +7,7 @@ namespace Crab\Tide;
 use Crab\Contracts\Database\Connection;
 use Crab\Contracts\Database\CursorPage;
 use Crab\Contracts\Database\Database;
+use Crab\Contracts\Database\Field;
 use Crab\Contracts\Database\Page;
 use Crab\Contracts\Database\Query;
 
@@ -471,6 +472,118 @@ final class ModelQuery
     {
         $this->assertCurrent();
         return $this->query->count();
+    }
+
+    /**
+     * The total of one of the model's numeric columns over the matching rows.
+     */
+    public function sum(string $column): int|float
+    {
+        $this->assertCurrent();
+        return $this->query->sum($this->numeric($column, 'sum'));
+    }
+
+    /**
+     * The average of one of the model's numeric columns, or null when no row matches.
+     */
+    public function avg(string $column): ?float
+    {
+        $this->assertCurrent();
+        return $this->query->avg($this->numeric($column, 'avg'));
+    }
+
+    /**
+     * The smallest value of one of the model's columns, as its property holds it: a date, an enum, a number.
+     * Null when no row matches.
+     */
+    public function min(string $column): mixed
+    {
+        $this->assertCurrent();
+        $field = $this->declared($column, 'min');
+        return self::typed($field, $this->query->min($this->named($column)));
+    }
+
+    /**
+     * The largest value of one of the model's columns, as its property holds it. Null when no row matches.
+     */
+    public function max(string $column): mixed
+    {
+        $this->assertCurrent();
+        $field = $this->declared($column, 'max');
+        return self::typed($field, $this->query->max($this->named($column)));
+    }
+
+    /**
+     * One of the model's columns of every matching row, each as its property holds it, keyed by another of
+     * its columns when given: pluck('title', 'id').
+     *
+     * @return array<int|string, mixed>
+     */
+    public function pluck(string $column, ?string $key = null): array
+    {
+        $this->assertCurrent();
+        $field = $this->declared($column, 'pluck');
+        $keyField = $key === null ? null : $this->declared($key, 'pluck');
+        if ($keyField !== null && !in_array($keyField->type, [Field::INT, Field::STRING], true)) {
+            throw new \LogicException(
+                "{$this->map->class} pluck() is keyed by \"{$key}\", which is not an int or string column; key it by one that is, such as the key.",
+            );
+        }
+        $values = [];
+        foreach ($this->query->pluck(
+            $this->named($column),
+            $key === null ? null : $this->named($key),
+        ) as $at => $value) {
+            $values[$keyField === null ? $at : $keyField->fromColumn($at)] = self::typed($field, $value);
+        }
+        return $key === null ? array_values($values) : $values;
+    }
+
+    /**
+     * One of the model's columns of the first matching row, as its property holds it, or null when none matches.
+     */
+    public function value(string $column): mixed
+    {
+        $this->assertCurrent();
+        $field = $this->declared($column, 'value');
+        return self::typed($field, $this->query->value($this->named($column)));
+    }
+
+    /**
+     * A column named to a reading method: one the model declares, so that its value can be read as its
+     * property's type. An expression or another table's column is the query builder's.
+     */
+    private function declared(string $column, string $method): Field
+    {
+        $plain = str_starts_with($column, $this->qualifier . '.')
+            ? substr($column, strlen($this->qualifier) + 1)
+            : $column;
+        return (
+            $this->map->columns[$plain] ?? throw new \LogicException(
+                "{$this->map->class} {$method}() names \"{$column}\", which is not one of its columns; name "
+                . implode(', ', array_keys($this->map->columns))
+                . ', or read another column or an expression with the query builder.',
+            )
+        );
+    }
+
+    private function numeric(string $column, string $method): string
+    {
+        $field = $this->declared($column, $method);
+        if (!in_array($field->type, [Field::INT, Field::FLOAT], true)) {
+            throw new \LogicException(
+                "{$this->map->class} {$method}() names \"{$column}\", which is not a number; name an int or float column.",
+            );
+        }
+        return $this->named($column);
+    }
+
+    /**
+     * A column's value as its property holds it; null, for a column or for no row at all, stays null.
+     */
+    private static function typed(Field $field, mixed $value): mixed
+    {
+        return $value === null ? null : $field->fromColumn($value);
     }
 
     /**

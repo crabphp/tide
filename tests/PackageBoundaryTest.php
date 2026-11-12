@@ -42,6 +42,9 @@ final class PackageBoundaryTest extends TestCase
         // relations; what cannot be told from the model's types, joins, expressions, raw values, is the builder's.
         self::assertTrue(method_exists(ModelQuery::class, 'select'));
         self::assertTrue(method_exists(ModelQuery::class, 'except'));
+        foreach (['count', 'sum', 'avg', 'min', 'max', 'pluck', 'value'] as $method) {
+            self::assertTrue(method_exists(ModelQuery::class, $method), $method);
+        }
         foreach ([
             'addSelect',
             'selectRaw',
@@ -55,12 +58,6 @@ final class PackageBoundaryTest extends TestCase
             'tap',
             'when',
             'whereRaw',
-            'sum',
-            'avg',
-            'min',
-            'max',
-            'pluck',
-            'value',
             'update',
             'increment',
             'decrement',
