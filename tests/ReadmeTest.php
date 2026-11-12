@@ -38,7 +38,7 @@ final class ReadmeTest extends DatabaseTestCase
             preg_match('/\A\/\/ ([a-z-]+\.php)\n/', $block, $name);
             $blocks[$name[1]] = $block;
         }
-        self::assertCount(10, $blocks, 'Every PHP block needs a runnable example name.');
+        self::assertCount(11, $blocks, 'Every PHP block needs a runnable example name.');
         // Separate namespaces allow the exact declarations to run on every driver.
         $namespace = 'TideReadme' . bin2hex(random_bytes(6));
         $directory = sys_get_temp_dir() . '/tide-readme-' . bin2hex(random_bytes(6));
@@ -51,7 +51,7 @@ final class ReadmeTest extends DatabaseTestCase
             $source =
                 "<?php\ndeclare(strict_types=1);\nnamespace {$namespace};\n"
                 . implode("\n", $blocks)
-                . "\nreturn [\$books, \$page, \$recent, \$json, \$copy, \$count, \$names, \$commented, \$owners, \$rows];\n";
+                . "\nreturn [\$books, \$page, \$recent, \$json, \$copy, \$count, \$names, \$titles, \$light, \$commented, \$owners, \$rows];\n";
             file_put_contents($directory . '/examples.php', $source);
             [
                 $books,
@@ -61,11 +61,15 @@ final class ReadmeTest extends DatabaseTestCase
                 $copy,
                 $count,
                 $names,
+                $titles,
+                $light,
                 $commented,
                 $owners,
                 $rows,
             ] = require $directory . '/examples.php';
             self::assertSame(1, $count);
+            self::assertSame('{"id":1,"title":"PHP"}', json_encode($titles[0], JSON_THROW_ON_ERROR));
+            self::assertSame('PHP', $light->title);
             self::assertSame(['First'], array_slice($names, 0, 1));
             self::assertSame('First!', $commented[0]->comments[0]->body);
             self::assertSame('Hello', $owners[0]->commentable->title);

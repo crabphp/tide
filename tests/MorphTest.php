@@ -200,6 +200,18 @@ final class MorphTest extends DatabaseTestCase
 
     #[DataProvider('drivers')]
     #[DataProvider('drivers')]
+    public function testAPartialSelectionStillReadsTheTypeAndIdColumns(string $driver): void
+    {
+        $this->seed($driver);
+        $comment = MorphComment::query()->select('body')->with('commentable')->find(2);
+        self::assertSame('Video one', $comment->commentable->title);
+        $post = MorphPost::query()
+            ->with('comments', static fn(ModelQuery $query): ModelQuery => $query->select('body'))
+            ->find(1);
+        self::assertSame(['on post 1', 'again on post 1'], self::bodies($post->comments));
+    }
+
+    #[DataProvider('drivers')]
     public function testRelatedAndWhereHasKeepToTheModelsType(string $driver): void
     {
         $this->seed($driver);

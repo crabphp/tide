@@ -38,10 +38,11 @@ final class PackageBoundaryTest extends TestCase
         self::assertNull($model->getConstructor());
         self::assertCount(1, $model->getProperties());
         self::assertTrue($model->getProperty('storedValues')->isPrivate());
-        // A model query chooses rows of its model and loads their relations; every other job is the builder's.
+        // A model query chooses rows of its model, and which of its own columns to read, and loads their
+        // relations; what cannot be told from the model's types, joins, expressions, raw values, is the builder's.
+        self::assertTrue(method_exists(ModelQuery::class, 'select'));
+        self::assertTrue(method_exists(ModelQuery::class, 'except'));
         foreach ([
-            'select',
-            'except',
             'addSelect',
             'selectRaw',
             'selectSub',

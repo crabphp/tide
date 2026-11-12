@@ -130,6 +130,19 @@ final readonly class Relation
     }
 
     /**
+     * The columns of the model the relation is read for that its rows are matched by.
+     *
+     * @return list<string>
+     */
+    public function localColumns(ModelMap $map): array
+    {
+        if ($this->attribute instanceof MorphTo) {
+            return [$this->attribute->type, $this->attribute->id];
+        }
+        return [$this->keys($map)[1]->column];
+    }
+
+    /**
      * @return array{ModelMap, Field, Field} Related map, parent field, related field.
      */
     public function keys(ModelMap $parent): array

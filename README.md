@@ -93,11 +93,21 @@ $page = Book::query()->orderBy('id')->paginate(20);
 $count = Book::query()->where('author_id', 1)->count();
 ```
 
-A query reads every column the model declares, named one by one, never `*`. `simplePaginate()`, `cursorPaginate()` and `chunkById()` return models too; cursor pagination and chunking go by the key unless given a column, and `chunkById()` refuses an existing order. Running a query leaves it unchanged; clone it to branch.
+A query reads every column the model declares, named one by one, never `*`. `select()` reads only the ones it names, and `except()` every one but those:
+
+```php
+// select.php
+$titles = Book::query()->select('title')->orderBy('id')->get();
+$light = Book::query()->except('internal_note')->find(1);
+```
+
+The other columns are left uninitialised: reading one is PHP's error, never a default or a null that looks like the row's value. JSON leaves them out, `save()` writes only what changed, an unread column you assign is written, and `refresh()` reads the whole row. The key is always read, and so are the keys the query's relations are matched by, the columns a cursor page is ordered by, and a column with a hook and a default, which PHP cannot leave uninitialised.
+
+`simplePaginate()`, `cursorPaginate()` and `chunkById()` return models too; cursor pagination and chunking go by the key unless given a column, and `chunkById()` refuses an existing order. Running a query leaves it unchanged; clone it to branch.
 
 ### What is the query builder's
 
-Tide maps rows and their relations and saves models. Everything else is the framework's query builder's, started on the database, with an `into()` record for a typed shape: a few columns, a join, an expression, a total, a raw condition, and writes to many rows at once.
+Tide maps rows and their relations and saves models: what its types can say. What they cannot is the framework's query builder's, started on the database, with an `into()` record for a typed shape: a join, an expression, a total, a raw condition or value, and writes to many rows at once.
 
 ```php
 // records.php

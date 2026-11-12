@@ -147,11 +147,12 @@ A model keeps one thing of its own: the values it was read with, or null while i
 
 `Book::query()` returns a `ModelQuery<Book>`: it chooses rows of its model and returns models. It has, each as a real method, the `where` family, `whereHas()` and `whereDoesntHave()`, `orderBy`, `limit`, `offset`, `lockForUpdate` and `with()`, and ends with `get`, `first`, `find`, `exists`, `count`, `paginate`, `simplePaginate`, `cursorPaginate` and `chunkById`. `Book::find($id)` is `Book::query()->find($id)`.
 
-Tide does the ORM's job only: it maps rows and relations and saves models. What the query builder already does, Tide does not repeat: a few columns, a join, an expression, a total, a raw condition, a value or a list of values, and writes to many rows. Those start on the database, `$db->current()->table('books')`, with an `into()` record for a typed shape. There is no handoff from a model query to the builder.
+Tide does the ORM's job only: it maps rows and relations and saves models, and does what the model's types can say. What they cannot, it leaves to the query builder: a join, an expression, a total, a raw condition, a value or a list of values, and writes to many rows. Those start on the database, `$db->current()->table('books')`, with an `into()` record for a typed shape. There is no handoff from a model query to the builder.
 
 | Case | Rule |
 | --- | --- |
-| Columns | Every declared column is named, never `*`; a model is a whole row |
+| Columns | Every declared column is named, never `*`. `select('title')` reads those, `except('body')` every other; the rest are uninitialised, never a default or null: reading one fails, JSON leaves it out, `save()` never writes it unless assigned, `refresh()` reads the whole row |
+| Columns always read | The key; the local keys of the query's relations and the foreign keys of a relation's own query; a cursor page's order columns; a column with a hook and a default |
 | Grouped conditions | Closures given to `where()` and `orWhere()` receive `ModelQuery`, so ordinary and relation predicates compose. The query cannot be run or copied inside one |
 | A condition on related rows | `whereHas('chapters', fn ($query) => ...)` and `whereDoesntHave()`, written as `EXISTS`, so a model is never repeated for each related row |
 | A value in a condition | Conditions pass values to the drivers: enums become backing values and dates become text |
