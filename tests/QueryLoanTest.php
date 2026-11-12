@@ -27,20 +27,10 @@ final class QueryLoanTest extends DatabaseTestCase
             static fn(ModelQuery $q) => $q->find(1),
             static fn(ModelQuery $q) => $q->exists(),
             static fn(ModelQuery $q) => $q->count(),
-            static fn(ModelQuery $q) => $q->sum('votes'),
-            static fn(ModelQuery $q) => $q->avg('votes'),
-            static fn(ModelQuery $q) => $q->min('votes'),
-            static fn(ModelQuery $q) => $q->max('votes'),
-            static fn(ModelQuery $q) => $q->pluck('id'),
-            static fn(ModelQuery $q) => $q->value('id'),
             static fn(ModelQuery $q) => $q->paginate(),
             static fn(ModelQuery $q) => $q->simplePaginate(),
             static fn(ModelQuery $q) => $q->cursorPaginate(),
             static fn(ModelQuery $q) => $q->chunkById(2, static fn(): bool => false),
-            static fn(ModelQuery $q) => $q->update(['title' => 'escaped']),
-            static fn(ModelQuery $q) => $q->increment('votes'),
-            static fn(ModelQuery $q) => $q->decrement('votes'),
-            static fn(ModelQuery $q) => $q->delete(),
             static fn(ModelQuery $q) => $q->loadRelations([Book::find(1)]),
         ] as $run) {
             $error = null;
@@ -104,7 +94,7 @@ final class QueryLoanTest extends DatabaseTestCase
     }
 
     #[DataProvider('drivers')]
-    public function testAnExpiredQueryCannotWriteInAnotherFibersTransaction(string $driver): void
+    public function testAnExpiredQueryCannotRunInAnotherFibersTransaction(string $driver): void
     {
         $this->start($driver);
         $query = $this->db->run(static fn(): ModelQuery => Book::query()->where('id', 1));
@@ -128,7 +118,7 @@ final class QueryLoanTest extends DatabaseTestCase
         try {
             $ready->suspend();
             try {
-                $query->update(['title' => 'escaped']);
+                $query->get();
             } catch (\LogicException $caught) {
                 $error = $caught;
             }

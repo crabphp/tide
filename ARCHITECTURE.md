@@ -145,22 +145,20 @@ A model keeps one thing of its own: the values it was read with, or null while i
 
 ## Queries
 
-`Book::query()` returns a `ModelQuery<Book>`. It forwards, each as a real method, the builder's conditions and order: the `where` family, `orderBy`, `latest`, `oldest`, `limit`, `offset`, `when`, `lockForUpdate`. It ends with `get`, `first`, `find`, `exists`, `count`, `sum`, `avg`, `min`, `max`, `pluck`, `value`, `paginate`, `simplePaginate`, `cursorPaginate` and `chunkById`. `Book::find($id)` is `Book::query()->find($id)`.
+`Book::query()` returns a `ModelQuery<Book>`: it chooses rows of its model and returns models. It has, each as a real method, the `where` family, `whereHas()` and `whereDoesntHave()`, `orderBy`, `limit`, `offset`, `lockForUpdate` and `with()`, and ends with `get`, `first`, `find`, `exists`, `count`, `paginate`, `simplePaginate`, `cursorPaginate` and `chunkById`. `Book::find($id)` is `Book::query()->find($id)`.
+
+Tide does the ORM's job only: it maps rows and relations and saves models. What the query builder already does, Tide does not repeat: a few columns, a join, an expression, a total, a raw condition, a value or a list of values, and writes to many rows. Those start on the database, `$db->current()->table('books')`, with an `into()` record for a typed shape. There is no handoff from a model query to the builder.
 
 | Case | Rule |
 | --- | --- |
-| Choosing columns | `select('title')` reads those, `except('body')` every other. The rest are uninitialised, never a default or null: reading one fails, JSON leaves it out, `save()` never writes it unless assigned, `refresh()` reads the whole row. Without either, every declared column is named, never `*` |
-| Columns always read | The key; the local keys of the query's relations and the foreign keys of a relation's own query; a cursor page's order columns; a column with a hook and a default, which PHP cannot leave uninitialised |
-| Joining, expressions, totals | Not on a model query, and no handoff to one: they are the framework's query builder's, started on the database, with an `into()` record for the shape. A model query returns models only |
-| Grouped conditions | Closures given to `where()` and `orWhere()` receive `ModelQuery`, so ordinary and relation predicates compose. Grouping through the builder in `tap()` still receives the builder |
-| A condition on related rows | `whereHas('chapters', fn ($query) => ...)` and `whereDoesntHave()`, written as `EXISTS` |
-| Something not forwarded | `tap(fn (Query $query) => ...)` gives the builder's query, for a condition or a lock. A join is refused there: a model query reads its own rows, one model each, and filters by related rows with `whereHas()`. If it stops reading a column the query chose, reading fails naming it; if it changes the columns the query reads, it is refused at `tap()` and points to `into()`: a joined column of the same name, the key included, would replace the model's own before any check of the row could see it |
-| `update([...])` and `delete()` on a query | One statement, straight to the database. Models already read are not changed |
-| A value in a condition or an update | Conditions pass values to the drivers: enums become backing values and dates become text. Every column of an update must be declared and is converted through its field; increment/decrement extras follow the same rule, and their target column must also be declared |
+| Columns | Every declared column is named, never `*`; a model is a whole row |
+| Grouped conditions | Closures given to `where()` and `orWhere()` receive `ModelQuery`, so ordinary and relation predicates compose. The query cannot be run or copied inside one |
+| A condition on related rows | `whereHas('chapters', fn ($query) => ...)` and `whereDoesntHave()`, written as `EXISTS`, so a model is never repeated for each related row |
+| A value in a condition | Conditions pass values to the drivers: enums become backing values and dates become text |
 | Cursor and chunk defaults | The declared key when the unique/cursor column is omitted; refused without a key. Chunking refuses an existing order |
-| Bulk writes with relation predicates | Refused before SQL when a `whereHas()` or `whereDoesntHave()` path or constraint reaches the target model's own table; read keys first and write with `whereIn()` |
 | A page or a chunk with `with()` | Relations are loaded for each page and each chunk |
-| A reusable condition | A static method on the model that takes and returns the model query, called directly or through `when()`; `tap()` receives the framework query |
+| A reusable condition | A static method on the model that takes and returns the model query |
+| Rows SQL chooses | The builder selects their ids and `whereIn('id', $ids)` reads them as models |
 
 ## Relations
 
@@ -220,7 +218,6 @@ $author->related('books')->latest('id')->limit(5)->get();   // as a query of its
 | Columns the database fills | Uninitialised after the insert. `refresh()` reads them; nothing reads them unasked |
 | A property on insert | Uninitialised, it is left out and the database gives its default; `refresh()` reads what it filled. Null, assigned or a `= null` default, is written as NULL, so the snapshot is what the row holds |
 | A hooked key or kept time | Refused, before anything is written, when Tide would fill it in: a database-numbered key, a time stamped into an empty property. PHP cannot make a hooked property uninitialised again on rollback |
-| `insertMany()` | One transaction, a savepoint inside another: a failing statement writes no row and leaves every model new |
 | A new model with no value at all | Refused |
 | `save()` on a read model | An update of the columns that changed, by the key it was read with. No change, no statement |
 | What counts as changed | A value that differs from the one read: scalars and arrays strictly, a date by its instant, an object of a `Cast` by what it writes, which sees a change made inside it |
@@ -230,7 +227,7 @@ $author->related('books')->latest('id')->limit(5)->get();   // as a query of its
 | A save the database refuses | The model is as it was, and can be corrected and saved again |
 | `delete()` | By key. The model is new again. Deleting a new model is refused. What is deleted with it is for foreign keys to say |
 | `refresh()` | Reads the row again and unloads its relations. Refused when the row is gone |
-| `created_at`, `updated_at` | Kept when the model declares them as dates: both at the first save, `updated_at` at each change, bulk `update()`, `increment()` and `decrement()` included. A time the application set is written as set; a save that changes nothing writes nothing. The time is the application's clock, to the second. `#[Timestamps]` names other columns, or null for one kept by hand |
+| `created_at`, `updated_at` | Kept when the model declares them as dates: both at the first save, `updated_at` at each change. A write to many rows is the query builder's and keeps no times. A time the application set is written as set; a save that changes nothing writes nothing. The time is the application's clock, to the second. `#[Timestamps]` names other columns, or null for one kept by hand |
 
 ## Connections and transactions
 

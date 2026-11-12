@@ -65,12 +65,11 @@ A property is an `int`, `float`, `string`, `bool`, a backed enum (stored as its 
 ```php
 $product  = Product::find(7);                                                        // ?Product
 $products = Product::query()->where('category', 'kitchen')->orderBy('name')->get();   // list<Product>
-$page     = Product::query()->latest('id')->paginate(20, $pageNumber);
+$page     = Product::query()->orderBy('id', 'desc')->paginate(20, $pageNumber);
 $taken    = Account::query()->where('email', $email)->exists();
-$names    = Product::query()->pluck('name', 'id');                                   // [id => name]
 ```
 
-The conditions are the query builder's, `where`, `whereIn`, `whereBetween`, `whereNull` and the rest, with `whereRaw('quantity * price >= ?', [100])` for what has no method, its values always bound. An enum or a date is given as it is: `where('status', OrderStatus::Paid)`.
+The conditions are the query builder's, `where`, `whereIn`, `whereBetween`, `whereNull` and the rest, their values always bound. An enum or a date is given as it is: `where('status', OrderStatus::Paid)`.
 
 A list is a PHP array of models. `paginate()`, `simplePaginate()` and `cursorPaginate()` give a `Page` whose `items` are models, and `chunkById()` walks a large table.
 
@@ -79,23 +78,20 @@ A query used in several places is a static method of the model. The sample's cat
 ```php
 public static function search(ProductSearch $search): ModelQuery
 {
-    return self::query()
-        ->when($search->q !== '', fn (ModelQuery $q) => $q->where('name', 'like', "%{$search->q}%"))
-        ->when($search->category !== null, fn (ModelQuery $q) => $q->where('category', $search->category))
-        ->orderBy('name');
+    $query = self::query()->orderBy('name');
+    if ($search->q !== '') {
+        $query->where('name', 'like', "%{$search->q}%");
+    }
+    if ($search->category !== null) {
+        $query->where('category', $search->category);
+    }
+    return $query;
 }
 
 $page = Product::search($search)->paginate($search->perPage, $search->page);
 ```
 
-A list that needs only some columns says so, and gets models with the rest uninitialised:
-
-```php
-$page = Product::query()->select('name', 'price')->orderBy('name')->paginate(20);   // JSON: id, name, price
-$product = Product::query()->except('description')->find($id);
-```
-
-A report, counts, sums, columns of several tables, is the query builder's or an `into()` record's; the sample's daily report and category counts are.
+A model is a whole row. A list of a few columns, a report, a total or columns of several tables is the query builder's, with an `into()` record for its shape; the sample's order list, daily report and category counts are.
 
 ## Relations
 
@@ -132,7 +128,7 @@ Order::query()->with('lines', fn (ModelQuery $q) => $q->where('quantity', '>', 1
 Order::load($orders, 'customer');
 
 // One model's related rows as a query of their own, where a limit is allowed
-$recent = $account->related('orders')->latest('id')->limit(5)->get();
+$recent = $account->related('orders')->orderBy('id', 'desc')->limit(5)->get();
 
 // Rows that have related rows
 Account::query()->whereHas('orders', fn (ModelQuery $q) => $q->where('status', OrderStatus::Shipped))->get();
@@ -178,15 +174,7 @@ $product->refresh();                           // read again from the database
 $product->delete();
 ```
 
-Several at once:
-
-| What you need | Write | What happens |
-| --- | --- | --- |
-| Their ids, or all of them or none | `Product::saveMany([$a, $b])` | One transaction, a statement for each; returns the models with their ids |
-| Speed, and not the ids | `OrderItem::insertMany($items)` | One statement for all of them, 500 rows at a time; returns how many were inserted. Models the database numbers stay without their ids |
-| A change to rows not loaded | `Product::query()->where('stock', '<', 10)->increment('stock', 60)` | One statement; `update()`, `increment()`, `decrement()` and `delete()`, with `updated_at` kept |
-
-In the sample, the lines of a placed order are written with `insertMany()`, and `Restock` refills every product running low in one statement. `saveMany()` is for an import or an administrator's batch edit.
+Several models are saved with `save()` for each, in a transaction. Rows written many at once, an import, a counter, the lines of an order, are the query builder's: `$db->table('products')->where('stock', '<', 10)->increment('stock', 60)` is one statement. It does not change models already held.
 
 ## Transactions
 
@@ -226,7 +214,7 @@ For another shape, give the model a method; the sample's `Product::summary()` is
 | --- | --- | --- |
 | Totals, counts, grouped reports | The query builder | `ListCategories`, `BuildDailyReport` |
 | The typed shape of one query's result | An `into()` record | `ListMyOrders` |
-| A counter changed by many at once | `increment()` or `decrement()` on a query | The stock taken in `PlaceOrder` |
+| A counter, rows written many at once | `increment()`, `decrement()`, `insertMany()` on the query builder | The stock taken in `PlaceOrder` |
 | A table with no model, the queue's, the cache's | The query builder | |
 
 ## What is not there

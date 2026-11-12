@@ -49,7 +49,7 @@ final class RelationsTest extends DatabaseTestCase
                 'chapters.notes',
                 static fn(ModelQuery $query) => $query->where('body', 'A note'),
                 'chapters',
-                static fn(ModelQuery $query) => $query->orderByDesc('id'),
+                static fn(ModelQuery $query) => $query->orderBy('id', 'desc'),
                 'chapters.notes',
             )
             ->orderBy('id')
@@ -58,7 +58,7 @@ final class RelationsTest extends DatabaseTestCase
         self::assertSame([2, 1], array_column($books[0]->chapters, 'id'));
         self::assertSame('A note', $books[0]->chapters[0]->notes[0]->body);
         self::assertSame([], $books[0]->chapters[1]->notes);
-        Book::load($books, 'isbn', static fn(ModelQuery $query) => $query->orderByDesc('id'));
+        Book::load($books, 'isbn', static fn(ModelQuery $query) => $query->orderBy('id', 'desc'));
         self::assertSame('second', $books[0]->isbn->code);
         Book::load($books, 'isbn');
         self::assertSame('first', $books[0]->isbn->code);
@@ -70,9 +70,9 @@ final class RelationsTest extends DatabaseTestCase
         $this->start($driver);
         $book = Book::find(1);
         self::assertSame('Ada', $book->related('author')->first()->name);
-        self::assertSame('second', $book->related('isbn')->orderByDesc('id')->first()->code);
-        self::assertSame([2], array_column($book->related('chapters')->orderByDesc('id')->limit(1)->get(), 'id'));
-        self::assertSame(['PHP', 'SQL'], $book->related('tags')->orderBy('id')->pluck('name'));
+        self::assertSame('second', $book->related('isbn')->orderBy('id', 'desc')->first()->code);
+        self::assertSame([2], array_column($book->related('chapters')->orderBy('id', 'desc')->limit(1)->get(), 'id'));
+        self::assertSame(['PHP', 'SQL'], array_column($book->related('tags')->orderBy('id')->get(), 'name'));
         self::assertFalse(Book::find(4)->related('author')->exists());
         self::assertFalse(isset($book->author));
     }
@@ -175,7 +175,6 @@ final class RelationsTest extends DatabaseTestCase
             'nested' => Book::query()->with('author.unknown')->get(),
             'limit' => Book::query()->with('chapters', static fn(ModelQuery $query) => $query->limit(1))->get(),
             'offset' => Book::query()->with('chapters', static fn(ModelQuery $query) => $query->offset(1))->get(),
-            'page' => Book::query()->with('chapters', static fn(ModelQuery $query) => $query->forPage(1))->get(),
             'new' => Book::load([new Book()], 'author'),
             'mixed' => Book::load([Author::find(1)], 'author'),
             'related-new' => new Book()->related('author'),
@@ -231,7 +230,6 @@ final class RelationsTest extends DatabaseTestCase
             ['nested',       'use one of its declared relations'],
             ['limit',        'use related('],
             ['offset',       'use related('],
-            ['page',         'use related('],
             ['new',          'save it before loading'],
             ['mixed',        'pass one class at a time'],
             ['related-new',  'save it first'],

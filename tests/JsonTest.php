@@ -24,12 +24,13 @@ final class JsonTest extends DatabaseTestCase
     public function testJsonContainsColumnsDatesEnumsAndOnlyLoadedVisibleRelations(string $driver): void
     {
         $this->start($driver);
-        Book::query()
+        $this->db
+            ->table('tide_books')
             ->where('id', 1)
             ->update([
-                'published_at' => new \DateTimeImmutable('2026-02-03 04:05:06'),
-                'status' => Status::Published,
-                'meta' => ['a' => [1, 2]],
+                'published_at' => '2026-02-03 04:05:06',
+                'status' => Status::Published->value,
+                'meta' => '{"a":[1,2]}',
             ]);
         $book = Book::find(1);
         $json = json_decode(json_encode($book, JSON_THROW_ON_ERROR), true, flags: JSON_THROW_ON_ERROR);

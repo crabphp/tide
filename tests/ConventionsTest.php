@@ -91,10 +91,13 @@ final class ConventionsTest extends DatabaseTestCase
         );
         self::assertSame(
             ['First', 'Second'],
-            TideNovel::query()
-                ->whereHas('labels', static fn($q) => $q->where('name', 'php'))
-                ->orderBy('id')
-                ->pluck('title'),
+            array_column(
+                TideNovel::query()
+                    ->whereHas('labels', static fn($q) => $q->where('name', 'php'))
+                    ->orderBy('id')
+                    ->get(),
+                'title',
+            ),
         );
 
         // Changing the key the convention found unloads the relation, as a named key does.

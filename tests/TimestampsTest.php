@@ -63,30 +63,6 @@ final class TimestampsTest extends DatabaseTestCase
     }
 
     #[DataProvider('drivers')]
-    public function testBulkChangesAreStamped(string $driver): void
-    {
-        $this->stamped($driver);
-        $row = new Stamped('bulk')->save();
-        $this->clock->set('2026-04-01 00:00:00');
-        Stamped::query()->where('id', $row->id)->update(['name' => 'changed']);
-        self::assertSame('2026-04-01 00:00:00', $this->times($row->id)[1]);
-
-        $this->clock->set('2026-04-02 00:00:00');
-        Stamped::query()->where('id', $row->id)->increment('hits');
-        self::assertSame('2026-04-02 00:00:00', $this->times($row->id)[1]);
-        Stamped::query()->where('id', $row->id)->decrement('hits', 1, ['name' => 'down']);
-        self::assertSame(['down', 0], [
-            $this->db->table('tide_stamped')->where('id', $row->id)->value('name'),
-            (int) $this->db->table('tide_stamped')->where('id', $row->id)->value('hits'),
-        ]);
-
-        Stamped::query()
-            ->where('id', $row->id)
-            ->update(['name' => 'given', 'updated_at' => new \DateTimeImmutable('2019-09-09 09:09:09')]);
-        self::assertSame('2019-09-09 09:09:09', $this->times($row->id)[1]);
-        self::assertSame('2026-03-04 05:06:07', $this->times($row->id)[0]);
-    }
-
     #[DataProvider('drivers')]
     public function testOneTimeCanBeLeftOutAndAParentCanDeclareThem(string $driver): void
     {

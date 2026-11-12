@@ -24,8 +24,6 @@ final class SecondReviewTest extends DatabaseTestCase
         $this->start($driver);
         $errors = [];
         foreach ([
-            static fn(ModelQuery $group) => $group->where('id', 2)->update(['title' => 'everything']),
-            static fn(ModelQuery $group) => $group->where('id', 2)->delete(),
             static fn(ModelQuery $group) => $group->where('id', 2)->get(),
             static fn(ModelQuery $group) => clone $group,
         ] as $inside) {
@@ -36,8 +34,11 @@ final class SecondReviewTest extends DatabaseTestCase
                 $errors[] = str_contains($error->getMessage(), 'run the query after the closure');
             }
         }
-        self::assertSame([true, true, true, true], $errors);
-        self::assertSame(['Alpha', 'Beta', 'Gamma', 'Delta'], Book::query()->orderBy('id')->pluck('title'));
+        self::assertSame([true, true], $errors);
+        self::assertSame(
+            ['Alpha', 'Beta', 'Gamma', 'Delta'],
+            array_column(Book::query()->orderBy('id')->get(), 'title'),
+        );
         self::assertSame(4, Book::query()->count());
     }
 
@@ -75,13 +76,10 @@ final class SecondReviewTest extends DatabaseTestCase
         $this->db->table('tide_categories')->insert(['id' => 4, 'parent_id' => 1, 'name' => 'sibling']);
         $this->db->table('tide_categories')->insert(['id' => 5, 'parent_id' => 2, 'name' => 'sibling']);
         $query = Category::find(1)->related('children')->orWhere('name', 'sibling');
-        self::assertSame([4], $query->pluck('id'));
-        self::assertSame(1, $query->update(['name' => 'renamed']));
-        self::assertSame('child', $this->db->table('tide_categories')->where('id', 2)->value('name'));
-        self::assertSame('sibling', $this->db->table('tide_categories')->where('id', 5)->value('name'));
+        self::assertSame([4], array_column($query->get(), 'id'));
         // A second alternative still stays inside the parent.
-        $either = Category::find(1)->related('children')->orWhere('name', 'renamed')->orWhere('name', 'child');
-        self::assertSame([2, 4], $either->orderBy('id')->pluck('id'));
+        $either = Category::find(1)->related('children')->orWhere('name', 'sibling')->orWhere('name', 'child');
+        self::assertSame([2, 4], array_column($either->orderBy('id')->get(), 'id'));
     }
 
     #[DataProvider('drivers')]
@@ -118,10 +116,9 @@ final class SecondReviewTest extends DatabaseTestCase
         try {
             $book = TaggedBook::find(1);
             $tags = $book->related('tags');
-            self::assertSame(['SQL'], (clone $tags)->where('id', 2)->pluck('name'));
-            self::assertSame(['PHP'], (clone $tags)->where(['name' => 'PHP'])->pluck('name'));
-            self::assertSame(['SQL', 'PHP'], (clone $tags)->orderByDesc('id')->pluck('name'));
-            self::assertSame(2, (clone $tags)->max('id'));
+            self::assertSame(['SQL'], array_column((clone $tags)->where('id', 2)->get(), 'name'));
+            self::assertSame(['PHP'], array_column((clone $tags)->where(['name' => 'PHP'])->get(), 'name'));
+            self::assertSame(['SQL', 'PHP'], array_column((clone $tags)->orderBy('id', 'desc')->get(), 'name'));
             self::assertSame(2, (clone $tags)->whereIn('id', [1, 2])->count());
             $loaded = TaggedBook::query()
                 ->with('tags', static fn(ModelQuery $query): ModelQuery => $query->where('id', 2))

@@ -155,13 +155,13 @@ final class SaveTest extends DatabaseTestCase
         $book = Book::query()->with('author', 'chapters')->find(1);
         $book->id = 90;
         $book->title = 'Unsaved';
-        Book::query()->where('id', 1)->update(['title' => 'Database']);
+        $this->db->table('tide_books')->where('id', 1)->update(['title' => 'Database']);
         self::assertSame($book, $book->refresh());
         self::assertSame(1, $book->id);
         self::assertSame('Database', $book->title);
         self::assertFalse(isset($book->author));
         self::assertFalse(isset($book->chapters));
-        Book::query()->where('id', 1)->delete();
+        $this->db->table('tide_books')->where('id', 1)->delete();
         $this->expectException(RowGone::class);
         $this->expectExceptionMessage('discard this model');
         $book->refresh();

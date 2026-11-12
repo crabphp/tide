@@ -82,26 +82,12 @@ final class Relations
                 // Only the rows whose type column names this model: a video's comment 7 is not post 7's.
                 $query->where($query->qualifier . '.' . $morph[0], $morph[1]);
             }
-            if ($relation->attribute instanceof BelongsToMany) {
-                // Said before the constraints are written, so that their columns are the related model's.
-                $query->joined();
-            }
             foreach ($node['constraints'] as $constraint) {
                 $query->constrain($constraint);
             }
             $query->prepareRelation($relation);
             // Validate nested names even when this particular relation has no rows.
             self::validate($related, $node['nested']);
-            // A partial selection still reads the keys rows are matched by, here and for the nested relations.
-            $query->prepareRead();
-            if (!$relation->attribute instanceof BelongsToMany) {
-                $query->need($foreign->column);
-            }
-            foreach (array_keys($node['nested']) as $nested) {
-                foreach ($related->relation($nested)->localColumns($related) as $column) {
-                    $query->need($column);
-                }
-            }
             $keys = [];
             $parentKeys = [];
             foreach ($models as $index => $model) {
@@ -127,7 +113,6 @@ final class Relations
                 $query
                     ->builder()
                     ->addSelect($relation->attribute->pivot . '.' . $relation->attribute->key . ' as ' . $pivotAlias);
-                $query->allow($pivotAlias);
                 $match = $relation->attribute->pivot . '.' . $relation->attribute->key;
             } else {
                 $match = $related->table . '.' . $foreign->column;
@@ -136,9 +121,6 @@ final class Relations
                 $batch = clone $query;
                 $batch->whereIn($match, $part);
                 $rows = $batch->builder()->get();
-                if ($rows !== []) {
-                    $query->assertShape($rows[0]);
-                }
                 foreach ($rows as $row) {
                     $group = $manyToMany
                         ? $local->fromColumn($row[$pivotAlias])
@@ -217,20 +199,11 @@ final class Relations
             }
             $query->prepareRelation($relation);
             self::validate($related, $node['nested']);
-            $query->prepareRead();
-            foreach (array_keys($node['nested']) as $nested) {
-                foreach ($related->relation($nested)->localColumns($related) as $column) {
-                    $query->need($column);
-                }
-            }
             $objects = [];
             foreach (array_chunk(array_values($keys), self::BATCH) as $part) {
                 $batch = clone $query;
                 $batch->whereIn($related->table . '.' . $key->column, $part);
                 $rows = $batch->builder()->get();
-                if ($rows !== []) {
-                    $query->assertShape($rows[0]);
-                }
                 foreach ($rows as $row) {
                     $identity = $key->fromColumn($row[$key->column]);
                     $objects[$identity] ??= $query->hydrate($row);
@@ -296,9 +269,6 @@ final class Relations
             } while (in_array($alias, $ancestors, true));
         }
         $query = new ModelQuery($related, $parent->database, $parent->connection, $alias);
-        if ($relation->attribute instanceof BelongsToMany) {
-            $query->joined();
-        }
         if ($rest === null && $constraint !== null) {
             $query->constrain($constraint);
         }
@@ -316,17 +286,12 @@ final class Relations
         if ($rest !== null) {
             $query->builder()->whereExists(self::exists($query, $rest, $constraint, $depth + 1, $ancestors));
         }
-        $parent->includeRelation(
-            $query,
-            $relation->attribute instanceof BelongsToMany ? $relation->attribute->pivot : null,
-        );
         return $query->builder();
     }
 
     private static function pivot(ModelQuery $query, Relation $relation, string $column): void
     {
         $pivot = $relation->attribute;
-        $query->joined();
         $query->builder()->join(
             $pivot->pivot,
             $pivot->pivot . '.' . $pivot->relatedKey,

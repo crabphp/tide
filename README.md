@@ -83,25 +83,21 @@ Public, backed properties are columns; private, protected, static and virtual pr
 
 ## Reading
 
-Conditions and ordering use the query builder's parameters, except that a closure given to `where()` or `orWhere()` receives a `ModelQuery`, with its conditions grouped. It can combine `whereHas()`, `whereDoesntHave()` and ordinary conditions. Builder grouping through `tap()` still receives the framework's `Query`. Inside such a closure the query can only be given conditions: running, cloning or tapping it there is refused, since the conditions being written are not yet part of it. A condition the model query has no method for is written with `whereRaw('quantity * price >= ?', [100])` or `orWhereRaw()`, there and anywhere else; every value is a binding. A query returns a PHP list of models, and `first()` or `find()` returns a model or null:
+A model query chooses rows of its model and returns models: conditions, `orderBy()`, `limit()`, `offset()` and `lockForUpdate()`, and relations through `with()`, `whereHas()` and `whereDoesntHave()`. A closure given to `where()` or `orWhere()` receives a `ModelQuery`, with its conditions grouped; the query cannot be run or copied inside it. `first()` and `find()` return a model or null, `get()` a list, and `exists()` and `count()` say whether and how many match:
 
 ```php
 // reading.php
 $books = Book::query()->where('title', 'like', '%PHP%')->orderBy('id')->get();
 $book = Book::find(1);
 $page = Book::query()->orderBy('id')->paginate(20);
-$names = Author::query()->orderBy('id')->pluck('name');
+$count = Book::query()->where('author_id', 1)->count();
 ```
 
-A query reads every column the model declares, named one by one, never `*`. `select()` reads only the columns it names, and `except()` every one but those:
+A query reads every column the model declares, named one by one, never `*`. `simplePaginate()`, `cursorPaginate()` and `chunkById()` return models too; cursor pagination and chunking go by the key unless given a column, and `chunkById()` refuses an existing order. Running a query leaves it unchanged; clone it to branch.
 
-```php
-// select.php
-$titles = Book::query()->select('title')->orderBy('id')->get();
-$light = Book::query()->except('internal_note')->find(1);
-```
+### What is the query builder's
 
-The other columns are left uninitialised: reading one is PHP's error, never a default or a null that looks like the row's value. JSON leaves them out, `save()` writes only what changed, an unread column you assign is written, and `refresh()` reads the whole row. The key is always read, and so are the keys the query's relations are matched by and the columns a cursor page is ordered by. A column with a hook and a default is always read too, since PHP cannot leave it uninitialised. A model query reads models and nothing else. A column the model does not declare, a join, an expression or a total is the framework's query builder's, started on the database, with an `into()` record for its typed shape:
+Tide maps rows and their relations and saves models. Everything else is the framework's query builder's, started on the database, with an `into()` record for a typed shape: a few columns, a join, an expression, a total, a raw condition, and writes to many rows at once.
 
 ```php
 // records.php
@@ -116,11 +112,11 @@ $rows = $database->current()->table('books')
     ->select('books.id', 'books.title', 'authors.name as author')
     ->into(BookRow::class)
     ->get();   // list<BookRow>
+
+$names = $database->current()->table('authors')->orderBy('id')->pluck('name');
 ```
 
-There is no handoff between the two: a model query returns models, the builder arrays or records. A model query has no joins: it reads its own rows, one model each. Filter by related rows with `whereHas()` and load them with `with()`. `tap()` is for a condition or a lock the model query has no method for; a join, or a change to the columns the query reads, is refused there, since a post joined to its comments would come back once per comment and a joined `id` would replace the model's own.
-
-`simplePaginate()`, `cursorPaginate()` and `chunkById()` also return models. Cursor pagination and chunking default to the declared key and require one when their column is omitted. `chunkById()` reads in ascending order of that column and refuses an existing order; remove `orderBy()` before calling it. Aggregates, `value()` and `pluck()` return plain database values. Query execution leaves the query unchanged; clone it to branch. `when()` receives the model query. `tap()` receives the framework's `Query` for operations not forwarded; a partial selection fails when it cannot make a whole model row.
+There is no handoff between the two: a model query returns models, the builder arrays or records. Where SQL decides which rows and models are wanted, give the builder's ids to `whereIn('id', ...)`. A model query has no joins, so a model is never repeated for each related row: filter by related rows with `whereHas()`.
 
 ## Relations
 
@@ -132,8 +128,8 @@ use Crab\Tide\ModelQuery;
 
 $books = Book::query()->with('author')->orderBy('id')->get();
 Book::load($books, 'author');
-$authors = Author::query()->with('books', static fn (ModelQuery $query): ModelQuery => $query->orderByDesc('id'))->get();
-$recent = Author::find(1)->related('books')->orderByDesc('id')->limit(5)->get();
+$authors = Author::query()->with('books', static fn (ModelQuery $query): ModelQuery => $query->orderBy('id', 'desc'))->get();
+$recent = Author::find(1)->related('books')->orderBy('id', 'desc')->limit(5)->get();
 $withBooks = Author::query()->whereHas('books')->get();
 $withoutBooks = Author::query()->whereDoesntHave('books')->get();
 $grouped = Book::query()->where(static fn (ModelQuery $query): ModelQuery => $query->whereHas('author')->orWhere('title', 'PHP'))->get();
@@ -145,7 +141,7 @@ A dotted path such as `books.author` loads through relations. A closure after a 
 
 On a many-to-many relation, a condition or an order on a plain column name means the related model's column, whatever the pivot table calls its own. A `related()` query keeps its parent condition permanently: later model conditions are grouped within that parent, so an `orWhere()` cannot reach another parent's rows. Order, limit and `with()` still apply to the query.
 
-A limit or offset in an eager constraint is refused; use `related()` for one model's limited query. A relation in another database reads that database's current connection, with a many-to-many pivot beside the related table. `whereHas()` and `whereDoesntHave()` cannot cross databases. `tap()` changes are not tracked for eager limit and order checks.
+A limit or offset in an eager constraint is refused; use `related()` for one model's limited query. A relation in another database reads that database's current connection, with a many-to-many pivot beside the related table. `whereHas()` and `whereDoesntHave()` cannot cross databases.
 
 ### Polymorphic relations
 
@@ -209,34 +205,15 @@ $book->delete();
 $book->save();
 ```
 
-A model that declares `created_at` and `updated_at` as dates has them kept, in PHP's default time zone, the one they are read back in: both when it is first saved, and `updated_at` at each change, bulk `update()`, `increment()` and `decrement()` included. A time you set yourself is written as you set it, and a save that changes nothing writes nothing. The time is the application's clock, to the second.
+A model that declares `created_at` and `updated_at` as dates has them kept, in PHP's default time zone, the one they are read back in: both when it is first saved, and `updated_at` at each change. A time you set yourself is written as you set it, and a save that changes nothing writes nothing. The time is the application's clock, to the second.
 
-`saveMany()` saves several models of one class, new or stored, in one transaction, so that all are written or none is, and returns them with their keys and times:
-
-```php
-// save-many.php
-[$ada, $grace] = Author::saveMany([new Author('Ada'), new Author('Grace')]);
-```
-
-It is `save()` for each, one statement apiece. Inside a transaction already, it is a savepoint of it.
-
-Many new models of one class are inserted together with `insertMany()`, which returns how many rows it inserted:
-
-```php
-// insert-many.php
-$drafts = [new Book('First', $author->id), new Book('Second', $author->id)];
-$count = Book::insertMany($drafts);   // 2
-```
-
-Each is written as `save()` writes it. A model whose key you gave is stored afterwards. One whose key the database numbers stays new, without its key, since a database tells only the first of several; read the rows back where you need them. Thousands of rows are sent in parts of 500.
-
-An insert writes what the model holds. A property never given a value, declared without a default, is left out, so the database gives the column its default; the model learns it when you `refresh()` it. Null, assigned or a property's `= null` default, is written as NULL, so the model and the row say the same. Declare a column whose database default you want without a PHP default. A database-numbered key and a kept time cannot have a hook when Tide must fill them in: PHP cannot take a hooked property back on rollback, so the save is refused before it writes. `insertMany()` is one transaction, so a failure writes no row.
+An insert writes what the model holds. A property never given a value, declared without a default, is left out, so the database gives the column its default; the model learns it when you `refresh()` it. Null, assigned or a property's `= null` default, is written as NULL, so the model and the row say the same. Declare a column whose database default you want without a PHP default. A database-numbered key and a kept time cannot have a hook when Tide must fill them in: PHP cannot take a hooked property back on rollback, so the save is refused before it writes.
 
 Changing a foreign key and saving unsets its loaded `BelongsTo` property. Assigning a relation itself changes no foreign key. Arrays and scalars compare strictly, dates by their instant, and cast objects by their written value, including mutations inside them. Mutable `DateTime` values held by `DateTimeInterface` or `mixed` columns are snapshotted as immutable copies, so in-place date changes are detected. A failed statement leaves the snapshot untouched so you can correct the model and save again.
 
-Deletes and updates use the stored key, even if you changed the key property. Delete makes the model new again and keeps loaded relations. Refresh reads into the same object, unloads relations and throws `RowGone` if the row disappeared. Clone keeps the original snapshot and still represents the same row. Bulk `update()`, `increment()`, `decrement()` and `delete()` operate directly on the database and do not change models already held. Every written column must be declared by the model, including the increment/decrement column and extra values; extras use the same field conversion as `update()`. Use the query builder to write other columns.
+Deletes and updates use the stored key, even if you changed the key property. Delete makes the model new again and keeps loaded relations. Refresh reads into the same object, unloads relations and throws `RowGone` if the row disappeared. Clone keeps the original snapshot and still represents the same row.
 
-Bulk writes with `whereHas()` or `whereDoesntHave()` reaching the target model's own table, through a path or a constraint too, are refused on every driver. Read the matching keys first, then write with `whereIn()`. Reads with those relation conditions are supported.
+Several models are saved together with `save()` for each inside a transaction. A write to many rows at once, an import, a counter, is the query builder's: `$database->current()->table('books')->where('author_id', 1)->increment('votes')`. It does not change models already held, and keeps no times; refresh a model where it matters.
 
 ## Transactions
 

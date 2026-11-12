@@ -32,16 +32,16 @@ final class PackageBoundaryTest extends TestCase
         self::assertSame([], $violations);
     }
 
-    public function testTheModelOwnsOnlyItsPrivateSnapshotAndTheQueryChoosesOnlyItsOwnColumns(): void
+    public function testTheModelOwnsOnlyItsSnapshotAndTheQueryOnlySelectsModels(): void
     {
         $model = new \ReflectionClass(Model::class);
         self::assertNull($model->getConstructor());
         self::assertCount(1, $model->getProperties());
         self::assertTrue($model->getProperty('storedValues')->isPrivate());
-        // A model query may read some of its own columns; it never reads another shape.
-        self::assertTrue(method_exists(ModelQuery::class, 'select'));
-        self::assertTrue(method_exists(ModelQuery::class, 'except'));
+        // A model query chooses rows of its model and loads their relations; every other job is the builder's.
         foreach ([
+            'select',
+            'except',
             'addSelect',
             'selectRaw',
             'selectSub',
@@ -51,11 +51,24 @@ final class PackageBoundaryTest extends TestCase
             'having',
             // A shape a model is not is the query builder's, started on the database: there is no handoff.
             'into',
+            'tap',
+            'when',
+            'whereRaw',
+            'sum',
+            'avg',
+            'min',
+            'max',
+            'pluck',
+            'value',
+            'update',
+            'increment',
+            'decrement',
+            'delete',
         ] as $method) {
-            self::assertFalse(method_exists(ModelQuery::class, $method));
+            self::assertFalse(method_exists(ModelQuery::class, $method), $method);
         }
-        // A condition in SQL is offered, with bindings: it narrows the rows and never changes their shape.
-        self::assertTrue(method_exists(ModelQuery::class, 'whereRaw'));
+        self::assertFalse(method_exists(Model::class, 'insertMany'));
+        self::assertFalse(method_exists(Model::class, 'saveMany'));
         self::assertFalse(is_subclass_of(ModelQuery::class, \Crab\Contracts\Database\Query::class));
     }
 }

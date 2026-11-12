@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Crab\Tide\Tests;
 
 use Crab\Contracts\Database\Cast;
-use Crab\Contracts\Database\Query;
 use Crab\Database\ColumnName;
 use Crab\Database\Json;
 use Crab\Tide\BelongsTo;
@@ -18,8 +17,6 @@ use Crab\Tide\Table;
 use Crab\Tide\Tests\Support\Book;
 use Crab\Tide\Tests\Support\Category;
 use Crab\Tide\Tests\Support\DatabaseTestCase;
-use Crab\Tide\Tests\Support\Money;
-use Crab\Tide\Tests\Support\Price;
 use Crab\Tide\Tests\Support\RecordingDatabase;
 use Crab\Tide\Tide;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -44,10 +41,11 @@ final class ReviewFixesTest extends DatabaseTestCase
         $row = RawNode::query()->with('children')->find(1);
         self::assertSame(101, $row->id);
         self::assertSame(102, $row->children[0]->id);
-        self::assertSame([2], $row->related('children')->pluck('id'));
+        // Found by the raw key 1, not the getter's 101; read back through the getter, child 2 is 102.
+        self::assertSame([102], array_column($row->related('children')->get(), 'id'));
         $child = RawNode::query()->with('parent')->find(2);
         self::assertSame(101, $child->parent->id);
-        self::assertSame([1], $child->related('parent')->pluck('id'));
+        self::assertSame([101], array_column($child->related('parent')->get(), 'id'));
         $row->name = 'changed';
         $row->save();
         self::assertSame('changed', $this->db->table('tide_categories')->where('id', 1)->value('name'));
@@ -132,7 +130,7 @@ final class ReviewFixesTest extends DatabaseTestCase
         self::assertSame(['id' => 1, 'parent_id' => null, 'name' => 'changed'], $row->jsonSerialize());
         UnsafeVirtual::load([$row], 'children');
         self::assertSame([2], array_column($row->children, 'id'));
-        self::assertSame([2], $row->related('children')->pluck('id'));
+        self::assertSame([2], array_column($row->related('children')->get(), 'id'));
         $row->refresh();
         self::assertSame('changed', $row->name);
     }
@@ -161,7 +159,6 @@ final class ReviewFixesTest extends DatabaseTestCase
         $this->db->table('tide_categories')->insert(['id' => 4, 'parent_id' => 1, 'name' => 'leaf']);
         $query = Category::find(1)->related('children')->where('name', 'child')->orWhere('name', 'leaf');
         self::assertSame([2, 4], array_column((clone $query)->orderBy('id')->get(), 'id'));
-        self::assertSame(2, $query->update(['name' => 'matched']));
         self::assertSame('leaf', Category::find(3)->name);
         $base = Category::find(1)->related('children')->where('id', 2);
         foreach ([
@@ -178,15 +175,15 @@ final class ReviewFixesTest extends DatabaseTestCase
         ] as $condition) {
             $branch = clone $base;
             $condition($branch);
-            self::assertSame([], array_diff($branch->pluck('id'), [2, 4]));
+            self::assertSame([], array_diff(array_column($branch->get(), 'id'), [2, 4]));
         }
-        self::assertSame([2], $base->pluck('id'));
+        self::assertSame([2], array_column($base->get(), 'id'));
         self::assertSame(
             [4],
             array_column(
                 Category::find(1)
                     ->related('children')
-                    ->orderByDesc('id')
+                    ->orderBy('id', 'desc')
                     ->limit(1)
                     ->with('parent')
                     ->get(),
@@ -196,50 +193,7 @@ final class ReviewFixesTest extends DatabaseTestCase
     }
 
     #[DataProvider('drivers')]
-    public function testBulkWritesRefuseEveryUndeclaredColumnBeforeSql(string $driver): void
-    {
-        $this->start($driver);
-        $recording = new RecordingDatabase($this->db);
-        Tide::use($recording);
-        foreach ([
-            static fn() => MinimalBook::query()->update(['secret' => 'changed']),
-            static fn() => MinimalBook::query()->increment('votes'),
-            static fn() => MinimalBook::query()->decrement('votes'),
-            static fn() => MinimalBook::query()->increment('id', 1, ['secret' => 'changed']),
-            static fn() => MinimalBook::query()->decrement('id', 1, ['secret' => 'changed']),
-        ] as $write) {
-            $error = null;
-            try {
-                $write();
-            } catch (\LogicException $caught) {
-                $error = $caught;
-            }
-            self::assertInstanceOf(\LogicException::class, $error);
-            self::assertStringContainsString('use the query builder', $error->getMessage());
-            self::assertStringContainsString(MinimalBook::class, $error->getMessage());
-        }
-        self::assertSame([], $recording->recording->statements);
-    }
-
     #[DataProvider('drivers')]
-    public function testIncrementAndDecrementConvertTheirExtraFields(string $driver): void
-    {
-        $this->start($driver);
-        foreach (['increment', 'decrement'] as $method) {
-            Book::query()
-                ->where('id', 1)
-                ->{$method}('votes', 1, ['meta' => ['method' => $method]]);
-            self::assertSame(['method' => $method], Book::find(1)->meta);
-            $price = new Price();
-            $price->amount = new Money(10);
-            $price->save();
-            Price::query()
-                ->where('id', $price->id)
-                ->{$method}('id', 10, ['amount' => new Money(20)]);
-            self::assertSame(20, Price::query()->where('amount', 20)->first()->amount->cents);
-        }
-    }
-
     #[DataProvider('drivers')]
     public function testCursorPaginationDefaultsToTheMappedKeyAndRefusesNoKey(string $driver): void
     {
@@ -266,58 +220,16 @@ final class ReviewFixesTest extends DatabaseTestCase
                     static fn(ModelQuery $q) => $q->whereDoesntHave('children')->where('name', 'child'),
                 );
             });
-        self::assertSame([1, 2], $query->orderBy('id')->pluck('id'));
+        self::assertSame([1, 2], array_column($query->orderBy('id')->get(), 'id'));
         $query = Category::query()
             ->where('id', 99)
             ->orWhere(static function (ModelQuery $q): void {
                 $q->whereDoesntHave('children')->where('id', 3);
             });
-        self::assertSame([3], $query->pluck('id'));
-        self::assertSame(
-            [1],
-            Category::query()->tap(static fn(Query $q) => $q->where(static fn(Query $q) => $q->where('id', 1)))->pluck(
-                'id',
-            ),
-        );
+        self::assertSame([3], array_column($query->get(), 'id'));
     }
 
     #[DataProvider('drivers')]
-    public function testSelfRelationBulkWritesAreRefusedEvenThroughGroupsAndPaths(string $driver): void
-    {
-        $this->start($driver);
-        $queries = [
-            Category::query()->whereHas('children'),
-            Category::query()->whereDoesntHave('parent'),
-            Category::query()->whereHas('children.parent'),
-            Category::query()->where(static fn(ModelQuery $q) => $q->whereHas('children')),
-            Book::query()->whereHas('author.books'),
-            Book::query()->whereHas('author', static fn(ModelQuery $q) => $q->whereHas('books')),
-        ];
-        foreach ($queries as $query) {
-            self::assertIsInt($query->count());
-            foreach (['update', 'increment', 'decrement', 'delete'] as $method) {
-                $error = null;
-                try {
-                    match ($method) {
-                        'update' => $query->update(['id' => 100]),
-                        'increment' => $query->increment('id'),
-                        'decrement' => $query->decrement('id'),
-                        'delete' => $query->delete(),
-                    };
-                } catch (\LogicException $caught) {
-                    $error = $caught;
-                }
-                self::assertInstanceOf(\LogicException::class, $error);
-                self::assertStringContainsString('read the keys first', $error->getMessage());
-                self::assertStringContainsString('whereIn()', $error->getMessage());
-            }
-        }
-        self::assertSame(3, Category::query()->count());
-        $keys = Category::query()->whereHas('children')->pluck('id');
-        self::assertSame(2, Category::query()->whereIn('id', $keys)->update(['name' => 'safe']));
-        self::assertSame(3, Book::query()->whereHas('author')->update(['title' => 'allowed']));
-    }
-
     #[DataProvider('drivers')]
     public function testChunkingRefusesAnOrderBeforeItsCallback(string $driver): void
     {
@@ -326,7 +238,7 @@ final class ReviewFixesTest extends DatabaseTestCase
         $error = null;
         try {
             Book::query()
-                ->orderByDesc('id')
+                ->orderBy('id', 'desc')
                 ->chunkById(2, static function () use (&$calls): void {
                     ++$calls;
                 });
@@ -354,7 +266,7 @@ final class ReviewFixesTest extends DatabaseTestCase
         self::assertSame(102, $books[1]->first->id);
         self::assertNull($books[2]->first);
         CountedCode::$reads = 0;
-        CountedBook::load($books, 'first', static fn(ModelQuery $q) => $q->orderByDesc('id'));
+        CountedBook::load($books, 'first', static fn(ModelQuery $q) => $q->orderBy('id', 'desc'));
         self::assertSame(2, CountedCode::$reads);
         self::assertSame(101, $books[0]->first->id);
     }

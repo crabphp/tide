@@ -199,17 +199,6 @@ final class MorphTest extends DatabaseTestCase
     }
 
     #[DataProvider('drivers')]
-    public function testAPartialSelectionStillReadsTheTypeAndIdColumns(string $driver): void
-    {
-        $this->seed($driver);
-        $comment = MorphComment::query()->select('body')->with('commentable')->find(2);
-        self::assertSame('Video one', $comment->commentable->title);
-        $post = MorphPost::query()
-            ->with('comments', static fn(ModelQuery $query): ModelQuery => $query->select('body'))
-            ->find(1);
-        self::assertSame(['on post 1', 'again on post 1'], self::bodies($post->comments));
-    }
-
     #[DataProvider('drivers')]
     public function testRelatedAndWhereHasKeepToTheModelsType(string $driver): void
     {
@@ -233,22 +222,27 @@ final class MorphTest extends DatabaseTestCase
         );
         self::assertSame(
             ['Post one', 'Post two'],
-            MorphPost::query()->whereHas('comments')->orderBy('id')->pluck('title'),
+            array_column(MorphPost::query()->whereHas('comments')->orderBy('id')->get(), 'title'),
         );
         self::assertSame(
             ['Post one'],
-            MorphPost::query()
-                ->whereHas('comments', static fn(ModelQuery $query): ModelQuery => $query->where(
+            array_column(
+                MorphPost::query()->whereHas('comments', static fn(ModelQuery $query): ModelQuery => $query->where(
                     'body',
                     'again on post 1',
-                ))
-                ->pluck('title'),
+                ))->get(),
+                'title',
+            ),
         );
         self::assertSame(
             [],
-            MorphPost::query()
-                ->whereHas('comments', static fn(ModelQuery $query): ModelQuery => $query->where('body', 'on video 1'))
-                ->pluck('title'),
+            array_column(
+                MorphPost::query()->whereHas('comments', static fn(ModelQuery $query): ModelQuery => $query->where(
+                    'body',
+                    'on video 1',
+                ))->get(),
+                'title',
+            ),
         );
     }
 
