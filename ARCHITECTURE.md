@@ -1,6 +1,6 @@
 # Tide architecture
 
-Status: **released as 0.1.0, 2026-11-12.** The framework's own design is in [../framework/ARCHITECTURE.md](../framework/ARCHITECTURE.md), and this document follows its goals, layers and scopes.
+Status: **released as 0.2.0, 2026-11-12.** The framework's own design is in [../framework/ARCHITECTURE.md](../framework/ARCHITECTURE.md), and this document follows its goals, layers and scopes.
 
 ## What it is
 

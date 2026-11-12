@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.2.0 — 2026-11-12
+
+Requires `crabphp/framework` ^0.7.2, for its loan guard and typed queries.
+
 - Many-to-many polymorphic relations: `#[MorphToMany(Tag::class, 'taggable')]` and `#[MorphedByMany(Post::class, 'taggable')]`, through one pivot whose type column keeps every read to its own model.
 - `attach()`, `detach()` and `sync()` write a many-to-many relation's links, plain or polymorphic, by the related models' keys, each in one transaction.
 - `sum()`, `avg()`, `min()`, `max()`, `pluck()` and `value()` read only the model's own columns and give them as its properties hold them: a date as a `DateTimeImmutable`, an enum as the enum, a `#[Json]` column decoded. They used to accept any column or expression and give raw database values. `sum()` and `avg()` take only number columns.

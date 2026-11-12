@@ -67,9 +67,14 @@ $product  = Product::find(7);                                                   
 $products = Product::query()->where('category', 'kitchen')->orderBy('name')->get();   // list<Product>
 $page     = Product::query()->orderBy('id', 'desc')->paginate(20, $pageNumber);
 $taken    = Account::query()->where('email', $email)->exists();
+$total    = Order::query()->where('user_id', $user->id)->sum('total');                 // int
+$names    = Product::query()->orderBy('name')->pluck('name', 'id');                   // [id => name]
+$last     = Order::query()->max('created_at');                                        // ?DateTimeImmutable
 ```
 
 The conditions are the query builder's, `where`, `whereIn`, `whereBetween`, `whereNull` and the rest, their values always bound. An enum or a date is given as it is: `where('status', OrderStatus::Paid)`.
+
+`count()`, `sum()`, `avg()`, `min()`, `max()`, `pluck()` and `value()` read the model's own columns over the matching rows, `whereHas()` conditions included, each value as its property holds it: a date, an enum, decoded JSON.
 
 A list is a PHP array of models. `paginate()`, `simplePaginate()` and `cursorPaginate()` give a `Page` whose `items` are models, and `chunkById()` walks a large table.
 
@@ -161,6 +166,28 @@ final class Product extends Model
 
 $review->associate('reviewable', $product)->save();
 Review::query()->with('reviewable')->get();   // one query for the products, one for the orders
+```
+
+Tags on products and on orders share one pivot, `taggables`, whose `taggable_type` says which a row links:
+
+```php
+final class Product extends Model
+{
+    #[MorphToMany(Tag::class, 'taggable')] public array $tags;     // taggables: taggable_type, taggable_id, tag_id
+}
+
+final class Tag extends Model
+{
+    #[MorphedByMany(Product::class, 'taggable')] public array $products;
+}
+```
+
+A many-to-many relation's links, plain or polymorphic, are written by keys, each change in one transaction:
+
+```php
+$product->attach('tags', [$tea->id]);          // add what is missing
+$product->detach('tags', [$old->id]);          // remove these only
+$product->sync('tags', $input->tagIds);        // exactly these: an edit form's checkboxes
 ```
 
 ## Writing
