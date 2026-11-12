@@ -1,9 +1,6 @@
 # Tide by use case
 
-Tide gives Crab models: a class per table, whose objects you read, change and save. This guide goes through what an application does with them, with the [sample shop](https://github.com/crabphp/sample)'s own models as examples. The [README](../README.md) is the reference, with every rule; its examples are run by the tests.
-
-Tide is a separate package, `crabphp/tide`, for framework 0.7 or later: `composer require crabphp/tide`.
-
+- [Introduction](#introduction)
 - [Setting up](#setting-up)
 - [Declaring a model](#declaring-a-model)
 - [Reading](#reading)
@@ -13,6 +10,12 @@ Tide is a separate package, `crabphp/tide`, for framework 0.7 or later: `compose
 - [JSON for APIs](#json-for-apis)
 - [When not to use a model](#when-not-to-use-a-model)
 - [What is not there](#what-is-not-there)
+
+## Introduction
+
+Tide gives Crab models: a class per table, whose objects you read, change and save. This guide goes through what an application does with them, with the [sample shop](https://github.com/crabphp/sample)'s own models as examples. The [README](../README.md) is the reference, with every rule; its examples are run by the tests.
+
+Tide is a separate package, `crabphp/tide`, for framework 0.7 or later: `composer require crabphp/tide`.
 
 ## Setting up
 
