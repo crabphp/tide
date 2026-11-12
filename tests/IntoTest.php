@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Crab\Tide\Tests;
 
 use Crab\Contracts\Database\Query;
+use Crab\Tide\ModelQuery;
 use Crab\Tide\Tests\Support\Book;
 use Crab\Tide\Tests\Support\DatabaseTestCase;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -97,50 +98,56 @@ final class IntoTest extends DatabaseTestCase
     }
 
     #[DataProvider('drivers')]
-    public function testColumnsAJoinInTapAddsAreRefusedNotDropped(string $driver): void
+    public function testTapTakesConditionsButNoJoinAndNoOtherColumns(string $driver): void
     {
         $this->start($driver);
-        // A condition through tap() keeps the row's shape, and is fine.
+        // A condition through tap() keeps the rows and their shape, and is fine.
         self::assertCount(
             1,
             Book::query()->tap(static fn(Query $query): Query => $query->whereRaw('votes = ?', [2]))->get(),
         );
 
-        // A join that only filters keeps the model's columns, and is fine.
+        // whereHas() filters by related rows, as a join would, without one row per related row.
         self::assertSame(
             ['Alpha', 'Beta'],
             Book::query()
-                ->tap(
-                    static fn(Query $query): Query => $query->join(
-                        'tide_authors',
-                        'tide_authors.id',
-                        '=',
-                        'tide_books.author_id',
-                    )->where('tide_authors.name', 'Ada'),
-                )
+                ->whereHas('author', static fn(ModelQuery $query): ModelQuery => $query->where('name', 'Ada'))
                 ->orderBy('id')
                 ->pluck('title'),
         );
 
         foreach ([
-            'a joined column' => static fn(Query $query): Query => $query
-                ->join('tide_authors', 'tide_authors.id', '=', 'tide_books.author_id')
-                ->addSelect('tide_authors.name as author_name'),
+            // Even only to filter: a book joined to its chapters would come back once for each.
+            'a join that filters' => [
+                static fn(Query $query): Query => $query->join(
+                    'tide_chapters',
+                    'tide_chapters.book_id',
+                    '=',
+                    'tide_books.id',
+                ),
+                'was given a join in tap()',
+            ],
             // The joined id would replace the book's own, and save() would then write another book.
-            'a joined key of the same name' => static fn(Query $query): Query => $query
-                ->join('tide_authors', 'tide_authors.id', '=', 'tide_books.author_id')
-                ->addSelect('tide_authors.id'),
-            'an expression' => static fn(Query $query): Query => $query->selectRaw('votes * 2 as doubled'),
-        ] as $case => $tap) {
+            'a joined key of the same name' => [
+                static fn(Query $query): Query => $query
+                    ->join('tide_authors', 'tide_authors.id', '=', 'tide_books.author_id')
+                    ->addSelect('tide_authors.id'),
+                'was given a join in tap()',
+            ],
+            'an expression' => [
+                static fn(Query $query): Query => $query->selectRaw('votes * 2 as doubled'),
+                'had the columns it reads changed in tap()',
+            ],
+            'a narrower list' => [
+                static fn(Query $query): Query => $query->select('tide_books.id'),
+                'had the columns it reads changed in tap()',
+            ],
+        ] as $case => [$tap, $message]) {
             try {
                 Book::query()->where('id', 2)->tap($tap);
                 self::fail("Not refused: {$case}.");
             } catch (\LogicException $error) {
-                self::assertStringContainsString(
-                    'had the columns it reads changed in tap()',
-                    $error->getMessage(),
-                    $case,
-                );
+                self::assertStringContainsString($message, $error->getMessage(), $case);
             }
         }
     }

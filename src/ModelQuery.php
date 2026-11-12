@@ -89,13 +89,20 @@ final class ModelQuery
             );
         }
         $this->assertCurrent();
-        $before = self::projection($this->query->toSql());
+        $sql = $this->query->toSql();
         $callback($this->query);
-        if (self::projection($this->query->toSql()) !== $before) {
+        $after = $this->query->toSql();
+        if (substr_count(strtolower($after), ' join ') > substr_count(strtolower($sql), ' join ')) {
+            // One row per related row: a post joined to its comments comes back once for each, and every copy saves.
+            throw new \LogicException(
+                "{$this->map->class} query was given a join in tap(); a model query reads its own rows only. Filter by related rows with whereHas(), load them with with(), or join on the builder after into(YourRecord::class).",
+            );
+        }
+        if (self::projection($after) !== self::projection($sql)) {
             // A joined column of the same name would replace the model's own, its key included, before any
             // check of the row could see it, and save() would then write another row.
             throw new \LogicException(
-                "{$this->map->class} query had the columns it reads changed in tap(); a model reads only its own columns. tap() is for conditions, joins that filter and locks: read joined or computed columns into a record with into(YourRecord::class).",
+                "{$this->map->class} query had the columns it reads changed in tap(); a model reads only its own columns. tap() is for conditions and locks: read joined or computed columns into a record with into(YourRecord::class).",
             );
         }
         return $this;

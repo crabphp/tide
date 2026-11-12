@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- A model query has no joins: `tap()` refuses one, even one that only filters, since one row per joined row is one model each, and every copy saves. Filter with `whereHas()`; join on the builder after `into()`.
 - **Behaviour change:** an insert writes null as NULL. A property never given a value, declared without a default, is what is left to the database's default; a `= null` default or an assigned null used to be left out too, so the row held the default while the model said null. Declare a column whose database default you want without a PHP default.
 - `insertMany()` is one transaction: a statement failing part way, a duplicate in the second of several, used to leave the earlier rows written while every model still said it was new.
 - A save that would have Tide fill in a hooked property, a database-numbered key or a kept time in an empty property, is refused before it writes: PHP cannot make such a property uninitialised again when the transaction is rolled back, and a retry reused the old key.
