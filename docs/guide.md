@@ -103,7 +103,7 @@ $page = Product::query()->select('name', 'price')->orderBy('name')->paginate(20)
 $product = Product::query()->except('description')->find($id);
 ```
 
-A report, a total or columns of several tables is the query builder's, with an `into()` record for its shape; the sample's order list, daily report and category counts are.
+A grouped report, a total of an expression or columns of several tables is the query builder's, with an `into()` record for its shape; the sample's order list, daily report and category counts are.
 
 ## Relations
 
@@ -193,7 +193,7 @@ $product->sync('tags', $input->tagIds);        // exactly these: an edit form's 
 ## Writing
 
 ```php
-// A new row: its times are kept, and a null is left to the database's default
+// A new row: its times are kept; a property never set is left to the database's default, a null is written
 $product = new Product();
 $product->sku = 'TEA-001';
 $product->name = 'Green tea';
@@ -246,7 +246,7 @@ For another shape, give the model a method; the sample's `Product::summary()` is
 
 | For | Use | In the sample |
 | --- | --- | --- |
-| Totals, counts, grouped reports | The query builder | `ListCategories`, `BuildDailyReport` |
+| Grouped reports, totals of expressions | The query builder | `ListCategories`, `BuildDailyReport` |
 | The typed shape of one query's result | An `into()` record | `ListMyOrders` |
 | A counter, rows written many at once | `increment()`, `decrement()`, `insertMany()` on the query builder | The stock taken in `PlaceOrder` |
 | A table with no model, the queue's, the cache's | The query builder | |
