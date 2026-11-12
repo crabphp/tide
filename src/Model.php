@@ -168,7 +168,6 @@ abstract class Model implements \JsonSerializable
                 );
             }
             $owner = $target->requireKey();
-            $map->assign($this, $map->columns[$attribute->type]->property, $target->morph);
             $local = $map->columns[$attribute->id];
         } else {
             [$related, $local, $owner] = $declared->keys($map);
@@ -185,6 +184,10 @@ abstract class Model implements \JsonSerializable
                 . $model::class
                 . " with its {$owner->property}; save it first.",
             );
+        }
+        // Every check is made before anything is assigned: a refused association leaves the model as it was.
+        if ($attribute instanceof MorphTo) {
+            $map->assign($this, $map->columns[$attribute->type]->property, $target->morph);
         }
         $map->assign($this, $local->property, $target->value($model, $owner->property));
         $this->{$relation} = $model;

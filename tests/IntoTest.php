@@ -89,15 +89,42 @@ final class IntoTest extends DatabaseTestCase
             Book::query()->tap(static fn(Query $query): Query => $query->whereRaw('votes = ?', [2]))->get(),
         );
 
-        $query = Book::query()->tap(
-            static fn(Query $query): Query => $query
+        // A join that only filters keeps the model's columns, and is fine.
+        self::assertSame(
+            ['Alpha', 'Beta'],
+            Book::query()
+                ->tap(
+                    static fn(Query $query): Query => $query->join(
+                        'tide_authors',
+                        'tide_authors.id',
+                        '=',
+                        'tide_books.author_id',
+                    )->where('tide_authors.name', 'Ada'),
+                )
+                ->orderBy('id')
+                ->pluck('title'),
+        );
+
+        foreach ([
+            'a joined column' => static fn(Query $query): Query => $query
                 ->join('tide_authors', 'tide_authors.id', '=', 'tide_books.author_id')
                 ->addSelect('tide_authors.name as author_name'),
-        );
-        $this->expectException(\LogicException::class);
-        $this->expectExceptionMessage(
-            'read author_name, which is no column of the model; a model holds only its own columns, so read the others into a record',
-        );
-        $query->get();
+            // The joined id would replace the book's own, and save() would then write another book.
+            'a joined key of the same name' => static fn(Query $query): Query => $query
+                ->join('tide_authors', 'tide_authors.id', '=', 'tide_books.author_id')
+                ->addSelect('tide_authors.id'),
+            'an expression' => static fn(Query $query): Query => $query->selectRaw('votes * 2 as doubled'),
+        ] as $case => $tap) {
+            try {
+                Book::query()->where('id', 2)->tap($tap);
+                self::fail("Not refused: {$case}.");
+            } catch (\LogicException $error) {
+                self::assertStringContainsString(
+                    'had the columns it reads changed in tap()',
+                    $error->getMessage(),
+                    $case,
+                );
+            }
+        }
     }
 }

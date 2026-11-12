@@ -291,6 +291,33 @@ final class MorphTest extends DatabaseTestCase
         self::assertFalse(new \ReflectionProperty($comment, 'commentable')->isInitialized($comment));
     }
 
+    #[DataProvider('drivers')]
+    public function testARefusedAssociationLeavesTheModelAsItWas(string $driver): void
+    {
+        $this->seed($driver);
+        $comment = MorphComment::query()->with('commentable')->find(1);
+        foreach ([new MorphVideo(), new MorphComment('not an owner')] as $wrong) {
+            try {
+                $comment->associate('commentable', $wrong);
+                self::fail('Not refused.');
+            } catch (\LogicException) {
+                // Refused as it should be; what matters is what is left.
+            }
+        }
+        self::assertSame(['tide_posts', 1], [$comment->commentable_type, $comment->commentable_id]);
+        self::assertInstanceOf(MorphPost::class, $comment->commentable);
+        $comment->body = 'an unrelated edit';
+        $comment->save();
+        self::assertSame(
+            ['commentable_type' => 'tide_posts', 'commentable_id' => 1, 'body' => 'an unrelated edit'],
+            $this->db
+                ->table('tide_comments')
+                ->select('commentable_type', 'commentable_id', 'body')
+                ->where('id', 1)
+                ->first(),
+        );
+    }
+
     public function testARowWhoseTypeTheUnionDoesNotListIsRefused(): void
     {
         $this->seed('sqlite');

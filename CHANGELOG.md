@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- `tap()` that changes the columns a model query reads is refused. A joined `id` used to replace the model's own key, so `save()` wrote another row.
+- A failed `associate()` leaves the model as it was. A refused `MorphTo` target used to have its type column set already, so the next `save()` stored the wrong owner.
+- A record query from `into()`, and a model query, cannot run after the loan they were made in, even when the same connection is lent again (with the framework's loan guard).
 - `into(Record::class)` ends a model query as records, keeping its conditions and order, for a join or an expression a model cannot hold. A model query names its own columns with its table.
 - A row with a column the model does not declare, as a join in `tap()` adds, is refused, naming the column, instead of the column being dropped unseen.
 - A model query's pages are `Page<Book>` and `CursorPage<Book>`, and `chunkById()` passes `list<Book>`, for static analysis.

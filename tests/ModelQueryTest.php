@@ -134,7 +134,7 @@ final class ModelQueryTest extends DatabaseTestCase
         self::assertSame(1, $branch->count());
         self::assertSame(4, $query->count());
         $this->expectException(\LogicException::class);
-        $this->expectExceptionMessage('name it in select()');
+        $this->expectExceptionMessage('had the columns it reads changed in tap()');
         $query->tap(static fn(Query $query) => $query->select('id'))->first();
     }
 

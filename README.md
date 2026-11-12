@@ -118,7 +118,7 @@ $rows = Book::query()
     ->get();   // list<BookRow>
 ```
 
-A model query names its own columns with its table, so a join after `into()` leaves none ambiguous. `tap()` is for what keeps a model's shape, a condition or a lock: a row with a column the model does not declare, as a join in `tap()` adds, is refused, naming the column, never dropped unseen.
+A model query names its own columns with its table, so a join after `into()` leaves none ambiguous. `tap()` is for what keeps a model's shape: a condition, a join that only filters, a lock. One that changes the columns the query reads is refused at `tap()`, since a joined `id` would replace the model's own and `save()` would write another row. A record query from `into()` belongs to the loan it was made in, as a model query does.
 
 `simplePaginate()`, `cursorPaginate()` and `chunkById()` also return models. Cursor pagination and chunking default to the declared key and require one when their column is omitted. `chunkById()` reads in ascending order of that column and refuses an existing order; remove `orderBy()` before calling it. Aggregates, `value()` and `pluck()` return plain database values. Query execution leaves the query unchanged; clone it to branch. `when()` receives the model query. `tap()` receives the framework's `Query` for operations not forwarded; a partial selection fails when it cannot make a whole model row.
 

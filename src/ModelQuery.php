@@ -89,8 +89,25 @@ final class ModelQuery
             );
         }
         $this->assertCurrent();
+        $before = self::projection($this->query->toSql());
         $callback($this->query);
+        if (self::projection($this->query->toSql()) !== $before) {
+            // A joined column of the same name would replace the model's own, its key included, before any
+            // check of the row could see it, and save() would then write another row.
+            throw new \LogicException(
+                "{$this->map->class} query had the columns it reads changed in tap(); a model reads only its own columns. tap() is for conditions, joins that filter and locks: read joined or computed columns into a record with into(YourRecord::class).",
+            );
+        }
         return $this;
+    }
+
+    /**
+     * What a statement reads: its SQL up to the table it reads from.
+     */
+    private static function projection(string $sql): string
+    {
+        $from = stripos($sql, ' from ');
+        return $from === false ? $sql : substr($sql, 0, $from);
     }
 
     /**
