@@ -93,14 +93,21 @@ abstract class Model implements \JsonSerializable
         } else {
             $stamp = null;
         }
-        $connection = Tide::database($map->database)->current();
-        $connection->table($map->table)->where($key->column, $this->storedValues[$key->property])->update($written);
         $restore = [];
         if ($stamp !== null) {
             $restore[$stamp->property] = $map->initialized($this, $stamp->property)
                 ? [$map->value($this, $stamp->property)]
                 : false;
+            if ($restore[$stamp->property] === false && $map->hooked($stamp->property)) {
+                // Checked before the statement, so that nothing is written that could not be taken back.
+                throw new \LogicException(
+                    static::class
+                    . "::\${$stamp->property} has a hook and no value, and Tide would stamp it and have to take it back if the transaction is rolled back, which PHP cannot do for a hooked property; give it a value or declare it without hooks.",
+                );
+            }
         }
+        $connection = Tide::database($map->database)->current();
+        $connection->table($map->table)->where($key->column, $this->storedValues[$key->property])->update($written);
         $this->undoneBy($map, $connection, $this->storedValues, $restore);
         if ($stamp !== null) {
             $map->assign($this, $stamp->property, $changed[$stamp->property]);
@@ -233,9 +240,9 @@ abstract class Model implements \JsonSerializable
     }
 
     /**
-     * Inserts new models of this class in as few statements as can hold them, and
-     * returns how many rows were inserted. Each is written as save() writes it: its
-     * values converted, its times kept, a null left to the database. A model whose
+     * Inserts new models of this class in as few statements as can hold them, all
+     * or none in one transaction, and returns how many rows were inserted. Each is written as save() writes it: its
+     * values converted, its times kept, an unset property left to the database. A model whose
      * key was given is stored afterwards, as after save(). One whose key the database
      * numbers stays new, without its key, since a database tells only the first of
      * several: read the rows back where they are needed.
@@ -270,21 +277,26 @@ abstract class Model implements \JsonSerializable
             $prepared[$index] = $model->insertion($map, $key, $map->values($model));
             $groups[implode(',', array_keys($prepared[$index][0]))][] = $index;
         }
-        $connection = Tide::database($map->database)->current();
-        $count = 0;
-        foreach ($groups as $indexes) {
-            foreach (array_chunk($indexes, 500) as $part) {
-                $rows = array_map(static fn(int $index): array => $prepared[$index][0], $part);
-                $count += $connection->table($map->table)->insertMany($rows);
-            }
-        }
-        foreach ($models as $index => $model) {
-            [, $givenKey, $stamps, $before] = $prepared[$index];
-            if ($givenKey) {
-                $model->inserted($map, $key, $connection, true, $stamps, $before, null);
-            }
-        }
-        return $count;
+        // All or nothing, as saveMany(): a statement that fails part way would otherwise leave rows written
+        // while every model still says it is new. Inside a transaction already, it is a savepoint of it.
+        return Tide::database($map->database)
+            ->current()
+            ->transaction(static function (Connection $connection) use ($models, $map, $key, $prepared, $groups): int {
+                $count = 0;
+                foreach ($groups as $indexes) {
+                    foreach (array_chunk($indexes, 500) as $part) {
+                        $rows = array_map(static fn(int $index): array => $prepared[$index][0], $part);
+                        $count += $connection->table($map->table)->insertMany($rows);
+                    }
+                }
+                foreach ($models as $index => $model) {
+                    [, $givenKey, $stamps, $before] = $prepared[$index];
+                    if ($givenKey) {
+                        $model->inserted($map, $key, $connection, true, $stamps, $before, null);
+                    }
+                }
+                return $count;
+            });
     }
 
     /**
@@ -315,12 +327,20 @@ abstract class Model implements \JsonSerializable
             $before[$stamp->property] = array_key_exists($stamp->property, $values);
             $stamps[$stamp->property] = $values[$stamp->property] = Tide::now();
         }
+        // What Tide fills in, it takes back if the transaction is rolled back, and PHP cannot make a hooked
+        // property uninitialised again: refused before anything is written, not found out on a retry.
+        foreach ([...($givenKey ? [] : [$key->property => false]), ...$before] as $name => $wasSet) {
+            if (!$wasSet && $map->hooked($name)) {
+                throw new \LogicException(
+                    static::class
+                    . "::\${$name} has a hook, and Tide fills it in on insert and must be able to take it back if the transaction is rolled back, which PHP cannot do for a hooked property; give it a value before save(), or declare it without hooks.",
+                );
+            }
+        }
         $written = [];
         foreach ($values as $name => $value) {
-            // Null is left to the database: its default for the column, or null.
-            if ($value === null) {
-                continue;
-            }
+            // Only what has a value is written: an uninitialised property is left to the database's default, and
+            // null is written as NULL, so that the model says what the row holds.
             $field = $map->fields[$name];
             $written[$field->column] = $field->toColumn($value);
         }

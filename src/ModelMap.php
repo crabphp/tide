@@ -202,6 +202,14 @@ final class ModelMap
         return $this->readers[$name]->hasHooks() && $this->readers[$name]->hasDefaultValue();
     }
 
+    /**
+     * Whether a property has a hook, which PHP cannot make uninitialised again.
+     */
+    public function hooked(string $name): bool
+    {
+        return $this->readers[$name]->hasHooks();
+    }
+
     public function initialized(Model $model, string $name): bool
     {
         return $this->readers[$name]->isInitialized($model);

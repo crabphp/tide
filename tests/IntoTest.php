@@ -52,6 +52,23 @@ final class IntoTest extends DatabaseTestCase
     }
 
     #[DataProvider('drivers')]
+    public function testAJsonPathConditionStaysTheModelsAfterAJoin(string $driver): void
+    {
+        $this->start($driver);
+        $this->db->table('tide_books')->where('id', 2)->update(['meta' => '{"colour":"blue"}']);
+        $sql = Book::query()->where('meta->colour', 'blue')->toSql();
+        self::assertStringContainsString('`tide_books`.`meta`', $sql);
+        // tide_chapters has no meta, so join a table that does: the books again, under another name.
+        $rows = Book::query()
+            ->where('meta->colour', 'blue')
+            ->into(BookTitle::class)
+            ->join('tide_books as other', 'other.id', '=', 'tide_books.id')
+            ->select('tide_books.id', 'tide_books.title')
+            ->get();
+        self::assertEquals([new BookTitle(2, 'Beta')], $rows);
+    }
+
+    #[DataProvider('drivers')]
     public function testIntoOnARelatedQueryReadsOnlyThatParentsRows(string $driver): void
     {
         $this->start($driver);

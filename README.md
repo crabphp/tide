@@ -230,7 +230,7 @@ $count = Book::insertMany($drafts);   // 2
 
 Each is written as `save()` writes it. A model whose key you gave is stored afterwards. One whose key the database numbers stays new, without its key, since a database tells only the first of several; read the rows back where you need them. Thousands of rows are sent in parts of 500.
 
-A null property is left out of the insert, so the database gives the column its default, or null when it has none. The model learns what the database filled when you `refresh()` it. On a stored model null is a value like any other, and assigning it writes null.
+An insert writes what the model holds. A property never given a value, declared without a default, is left out, so the database gives the column its default; the model learns it when you `refresh()` it. Null, assigned or a property's `= null` default, is written as NULL, so the model and the row say the same. Declare a column whose database default you want without a PHP default. A database-numbered key and a kept time cannot have a hook when Tide must fill them in: PHP cannot take a hooked property back on rollback, so the save is refused before it writes. `insertMany()` is one transaction, so a failure writes no row.
 
 Changing a foreign key and saving unsets its loaded `BelongsTo` property. Assigning a relation itself changes no foreign key. Arrays and scalars compare strictly, dates by their instant, and cast objects by their written value, including mutations inside them. Mutable `DateTime` values held by `DateTimeInterface` or `mixed` columns are snapshotted as immutable copies, so in-place date changes are detected. A failed statement leaves the snapshot untouched so you can correct the model and save again.
 

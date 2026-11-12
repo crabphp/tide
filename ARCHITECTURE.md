@@ -218,7 +218,9 @@ $author->related('books')->latest('id')->limit(5)->get();   // as a query of its
 | `save()` on a new model | An insert of the properties that have a value. The rest are left to the database's defaults |
 | The key the database makes | Set on the model, for an `int` key. A `string` key is given before saving |
 | Columns the database fills | Uninitialised after the insert. `refresh()` reads them; nothing reads them unasked |
-| A null property on insert | Left out, so the database gives the column its default, or null when it has none. `refresh()` reads what it filled. On a stored model null is a value like any other and is written |
+| A property on insert | Uninitialised, it is left out and the database gives its default; `refresh()` reads what it filled. Null, assigned or a `= null` default, is written as NULL, so the snapshot is what the row holds |
+| A hooked key or kept time | Refused, before anything is written, when Tide would fill it in: a database-numbered key, a time stamped into an empty property. PHP cannot make a hooked property uninitialised again on rollback |
+| `insertMany()` | One transaction, a savepoint inside another: a failing statement writes no row and leaves every model new |
 | A new model with no value at all | Refused |
 | `save()` on a read model | An update of the columns that changed, by the key it was read with. No change, no statement |
 | What counts as changed | A value that differs from the one read: scalars and arrays strictly, a date by its instant, an object of a `Cast` by what it writes, which sees a change made inside it |

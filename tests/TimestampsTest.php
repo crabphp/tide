@@ -145,33 +145,33 @@ final class TimestampsTest extends DatabaseTestCase
     }
 
     #[DataProvider('drivers')]
-    public function testANullValueIsLeftToTheDatabaseOnInsert(string $driver): void
+    public function testAnUnsetPropertyIsLeftToTheDatabaseAndANullIsWritten(string $driver): void
     {
         $this->stamped($driver);
+        // Never given a value, the property leaves the column to its default; the model learns it when asked.
+        $unset = new UnsetDefaults();
+        $unset->name = 'unset';
+        $unset->save();
+        self::assertFalse(new \ReflectionProperty($unset, 'note')->isInitialized($unset));
+        self::assertSame(
+            'filled by the database',
+            $this->db->table('tide_stamped')->where('id', $unset->id)->value('note'),
+        );
+        self::assertSame('filled by the database', $unset->refresh()->note);
+
+        // Null, a default or assigned, is written as NULL, so the model and the row say the same.
         $row = new Defaults();
         $row->name = 'plain';
         $row->save();
-        // The property was null, so the column took its default; the model learns it when asked.
         self::assertNull($row->note);
-        self::assertSame(
-            'filled by the database',
-            $this->db->table('tide_stamped')->where('id', $row->id)->value('note'),
-        );
-        self::assertNull($this->db->table('tide_stamped')->where('id', $row->id)->value('created_at'));
-        self::assertSame('filled by the database', $row->refresh()->note);
+        self::assertNull($this->db->table('tide_stamped')->where('id', $row->id)->value('note'));
+        $row->note = 'mine';
+        $row->save();
+        $row->note = null;
+        $row->save();
+        self::assertNull($this->db->table('tide_stamped')->where('id', $row->id)->value('note'));
 
-        $given = new Defaults();
-        $given->name = 'given';
-        $given->note = 'mine';
-        $given->save();
-        self::assertSame('mine', $this->db->table('tide_stamped')->where('id', $given->id)->value('note'));
-
-        // On a stored model, null is a value like any other and is written.
-        $given->note = null;
-        $given->save();
-        self::assertNull($this->db->table('tide_stamped')->where('id', $given->id)->value('note'));
-
-        $empty = new Defaults();
+        $empty = new UnsetDefaults();
         try {
             $empty->save();
             self::fail('A model with nothing to write should be refused.');
@@ -265,6 +265,14 @@ final class Defaults extends Model
     public string $name;
     public ?string $note = null;
     public ?\DateTimeImmutable $created_at = null;
+}
+
+#[Table('tide_stamped'), Timestamps(created: null, updated: null)]
+final class UnsetDefaults extends Model
+{
+    public int $id;
+    public string $name;
+    public ?string $note;
 }
 
 #[Table('tide_stamped'), Timestamps]

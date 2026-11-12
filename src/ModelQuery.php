@@ -774,8 +774,10 @@ final class ModelQuery
      */
     private function named(string $column): string
     {
-        // Always with its table, so that a join after into() cannot make it ambiguous.
-        return isset($this->map->columns[$column]) ? $this->qualifier . '.' . $column : $column;
+        // Always with its table, so that a join after into() cannot make it ambiguous; a JSON path, meta->colour,
+        // by its column.
+        $base = str_contains($column, '->') ? strstr($column, '->', true) : $column;
+        return isset($this->map->columns[$base]) ? $this->qualifier . '.' . $column : $column;
     }
 
     /**

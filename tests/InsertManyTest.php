@@ -149,6 +149,32 @@ final class InsertManyTest extends DatabaseTestCase
         parent::tearDown();
     }
 
+    #[DataProvider('drivers')]
+    public function testAFailureInALaterPartWritesNothingAndLeavesEveryModelNew(string $driver): void
+    {
+        $this->tables($driver);
+        $codes = [];
+        foreach (range(1, 501) as $n) {
+            $made = new BulkCode();
+            // The 501st repeats the first, so the second statement of the batch fails.
+            $made->code = 'c' . ($n === 501 ? 1 : $n);
+            $made->label = 'L' . $n;
+            $codes[] = $made;
+        }
+        try {
+            BulkCode::insertMany($codes);
+            self::fail('A duplicate key was inserted.');
+        } catch (\Crab\Database\DatabaseException) {
+            // The duplicate is the database's to refuse.
+        }
+        self::assertSame(0, $this->db->table('tide_bulk_codes')->count(), 'The first 500 rows are not left behind.');
+        self::assertFalse($codes[0]->stored());
+
+        array_pop($codes);
+        self::assertSame(500, BulkCode::insertMany($codes), 'The same models can be inserted again.');
+        self::assertTrue($codes[0]->stored());
+    }
+
     private function tables(string $driver): void
     {
         $this->db = $this->database($driver);
@@ -174,7 +200,8 @@ final class BulkLine extends Model
     public Status $status = Status::Draft;
     #[Json]
     public array $meta = [];
-    public ?string $note = null;
+    // No default: never given, it leaves the column to the database's.
+    public ?string $note;
     public ?\DateTimeImmutable $created_at = null;
     public ?\DateTimeImmutable $updated_at = null;
 }

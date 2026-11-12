@@ -61,6 +61,20 @@ final class ReviewFixesTest extends DatabaseTestCase
         $new = new RawNode();
         $new->parent_id = null;
         $new->name = 'inserted';
+        // The database's number would be Tide's to take back on rollback, which PHP cannot do to a hooked key.
+        try {
+            $new->save();
+            self::fail('A hooked key the database numbers was inserted.');
+        } catch (\LogicException $error) {
+            self::assertStringContainsString('has a hook, and Tide fills it in on insert', $error->getMessage());
+        }
+        self::assertSame(
+            0,
+            $this->db->table('tide_categories')->where('name', 'inserted')->count(),
+            'Refused before writing.',
+        );
+        // A key given by the application is written as given, its getter bypassed.
+        $new->id = 102;
         $new->save();
         self::assertSame('inserted', $this->db->table('tide_categories')->where('id', 102)->value('name'));
         $new->save();

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- **Behaviour change:** an insert writes null as NULL. A property never given a value, declared without a default, is what is left to the database's default; a `= null` default or an assigned null used to be left out too, so the row held the default while the model said null. Declare a column whose database default you want without a PHP default.
+- `insertMany()` is one transaction: a statement failing part way, a duplicate in the second of several, used to leave the earlier rows written while every model still said it was new.
+- A save that would have Tide fill in a hooked property, a database-numbered key or a kept time in an empty property, is refused before it writes: PHP cannot make such a property uninitialised again when the transaction is rolled back, and a retry reused the old key.
+- A JSON-path condition, `where('meta->colour', 'blue')`, is written with the model's table, so a join after `into()` cannot make it ambiguous.
 - `tap()` that changes the columns a model query reads is refused. A joined `id` used to replace the model's own key, so `save()` wrote another row.
 - A failed `associate()` leaves the model as it was. A refused `MorphTo` target used to have its type column set already, so the next `save()` stored the wrong owner.
 - A record query from `into()`, and a model query, cannot run after the loan they were made in, even when the same connection is lent again (with the framework's loan guard).
