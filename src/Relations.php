@@ -247,13 +247,22 @@ final class Relations
         $query = self::relatedQuery($parent, $related);
         $key = self::value($parent->map, $model, $local->property, $relation);
         if ($relation->attribute instanceof BelongsToMany) {
-            self::pivot($query, $relation, $foreign->column);
+            // Its pivot's type, if it has one, joins the parent condition below, so that no orWhere() escapes it.
+            self::pivot($query, $relation, $foreign->column, typed: false);
             $match = $relation->attribute->pivot . '.' . $relation->attribute->key;
         } else {
             $match = $related->table . '.' . $foreign->column;
         }
+        $also = [];
         $morph = $relation->morphType($parent->map);
-        $query->scope($match, $key, $morph === null ? [] : [$related->table . '.' . $morph[0] => $morph[1]]);
+        if ($morph !== null) {
+            $also[$related->table . '.' . $morph[0]] = $morph[1];
+        }
+        $pivotType = $relation->pivotType();
+        if ($pivotType !== null) {
+            $also[$pivotType[0]] = $pivotType[1];
+        }
+        $query->scope($match, $key, $also);
         return $query;
     }
 
@@ -305,7 +314,10 @@ final class Relations
         return $query->builder();
     }
 
-    private static function pivot(ModelQuery $query, Relation $relation, string $column): void
+    /**
+     * @param bool $typed Whether a morph pivot's type condition is written here; related() writes it with its parent's.
+     */
+    private static function pivot(ModelQuery $query, Relation $relation, string $column, bool $typed = true): void
     {
         $pivot = $relation->attribute;
         $query->builder()->join(
@@ -314,6 +326,11 @@ final class Relations
             '=',
             $query->qualifier . '.' . $column,
         );
+        $type = $relation->pivotType();
+        if ($typed && $type !== null) {
+            // Only this morph name's links: post 1's tags are not video 1's.
+            $query->builder()->where($type[0], $type[1]);
+        }
     }
 
     private static function relatedQuery(ModelQuery $parent, ModelMap $related): ModelQuery

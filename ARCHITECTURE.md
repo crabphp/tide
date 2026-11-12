@@ -208,6 +208,8 @@ $author->related('books')->latest('id')->limit(5)->get();   // as a query of its
 | `#[MorphTo]` | Its union type lists the models it may belong to; the type column holds one's morph name and the id column its key, named after the property unless said. The morph name is the table's, or `#[Table(morph: ...)]`, so a class can be renamed without changing rows. Two listed models with one morph name are refused |
 | Loading a `MorphTo` | Grouped by type, one query per model per batch of keys. A type the union does not list is refused, naming it. A nested path past it must be a relation of each listed model. `related()` and `whereHas()` cannot follow it |
 | `#[MorphMany]`, `#[MorphOne]` | Paired with the related model's `MorphTo` that lists this model, or the one `relation:` names. Every read, `with()`, `related()` and `whereHas()`, keeps to rows whose type column holds this model's morph name, so a video's comment 7 never reaches post 7 |
+| `#[MorphToMany]`, `#[MorphedByMany]` | A `BelongsToMany` whose pivot has a type column: the name gives the pivot, plural, and its `_type` and `_id` columns. `MorphToMany` holds its own model's morph name there, `MorphedByMany` the related model's. Loading, `whereHas()` and the totals add the type condition; `related()` adds it to its parent condition, so no `orWhere()` escapes it |
+| `attach()`, `detach()`, `sync()` | The links of any many-to-many relation, by the related models' keys, in one transaction or a savepoint. `attach()` leaves a link already there, `detach()` removes only the given, `sync()` locks the model's row and makes the links exactly the given. Refused for another kind of relation, a new model, keys of another type, and a pivot in another database. The relation is unloaded afterwards |
 | `associate()` | Points a `BelongsTo` or `MorphTo` at a stored model, or at none with null: sets its key column, and a morph's type column, and the relation. `save()` writes them. Saving a changed type or id unsets the loaded `MorphTo` |
 
 ## Writing
@@ -285,7 +287,7 @@ The suite covers mapping, persistence, query forwarding, relations, transactions
 - Soft deletes.
 - A dictionary of irregular plurals. `#[Table]` names the table of a word English makes plural another way.
 - Validation rules on a model. A request is validated by its action.
-- Many-to-many polymorphic relations, relations through another model, keys of several columns.
+- Relations through another model, keys of several columns.
 - A generator, `make:model`, and a check of models against the schema.
 
 ## Settled choices

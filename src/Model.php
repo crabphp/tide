@@ -202,6 +202,43 @@ abstract class Model implements \JsonSerializable
     }
 
     /**
+     * Links this model to related models of a many-to-many relation, plain or
+     * polymorphic, by their keys; a link already there is left as it is.
+     *
+     *     $post->attach('tags', [$php->id]);
+     *
+     * @param list<int|string> $ids
+     */
+    public function attach(string $relation, array $ids): static
+    {
+        Pivots::change($this, $relation, 'attach', $ids);
+        return $this;
+    }
+
+    /**
+     * Removes the links of a many-to-many relation to these related models, and no other.
+     *
+     * @param list<int|string> $ids
+     */
+    public function detach(string $relation, array $ids): static
+    {
+        Pivots::change($this, $relation, 'detach', $ids);
+        return $this;
+    }
+
+    /**
+     * Makes a many-to-many relation's links exactly these, in one transaction:
+     * the missing are added and the others removed. sync('tags', []) removes them all.
+     *
+     * @param list<int|string> $ids
+     */
+    public function sync(string $relation, array $ids): static
+    {
+        Pivots::change($this, $relation, 'sync', $ids);
+        return $this;
+    }
+
+    /**
      * What a #[MorphTo] type column holds for this model: its table's name, or #[Table(morph: ...)].
      */
     public static function morphName(): string

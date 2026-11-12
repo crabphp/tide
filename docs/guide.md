@@ -230,4 +230,4 @@ For another shape, give the model a method; the sample's `Product::summary()` is
 - Events, observers and global scopes: what happens is written where it happens.
 - Soft deletes: a column of your own, and a condition on it.
 - A collection class: a list is a PHP array.
-- Many-to-many polymorphic relations and keys of several columns.
+- Relations through another model, and keys of several columns.

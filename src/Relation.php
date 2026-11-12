@@ -15,6 +15,8 @@ final readonly class Relation
 {
     /**
      * @param list<class-string<Model>> $targets The models a MorphTo may belong to, from its union type.
+     * @param array{string, class-string<Model>}|null $pivotMorph For a MorphToMany or MorphedByMany, read as a
+     *     BelongsToMany: the pivot's type column, and the model whose morph name it holds.
      */
     private function __construct(
         public string $property,
@@ -23,6 +25,7 @@ final readonly class Relation
         public bool $nullable,
         public BelongsTo|HasOne|HasMany|BelongsToMany|MorphTo|MorphOne|MorphMany $attribute,
         public array $targets = [],
+        public ?array $pivotMorph = null,
     ) {}
 
     /**
@@ -30,7 +33,7 @@ final readonly class Relation
      */
     public static function of(
         \ReflectionProperty $property,
-        BelongsTo|HasOne|HasMany|BelongsToMany|MorphTo|MorphOne|MorphMany $attribute,
+        BelongsTo|HasOne|HasMany|BelongsToMany|MorphTo|MorphOne|MorphMany|MorphToMany|MorphedByMany $attribute,
         string $owner,
     ): self {
         $name = $property->getName();
@@ -59,7 +62,12 @@ final readonly class Relation
                 self::targets($type, $where),
             );
         }
-        $many = $attribute instanceof HasMany || $attribute instanceof BelongsToMany || $attribute instanceof MorphMany;
+        $many =
+            $attribute instanceof HasMany
+            || $attribute instanceof BelongsToMany
+            || $attribute instanceof MorphMany
+            || $attribute instanceof MorphToMany
+            || $attribute instanceof MorphedByMany;
         $typeName = $type instanceof \ReflectionNamedType ? $type->getName() : '';
         $typeName = match ($typeName) {
             'self' => $property->getDeclaringClass()->getName(),
@@ -84,6 +92,22 @@ final readonly class Relation
         if (!is_subclass_of($related, Model::class)) {
             throw new \LogicException(
                 "{$where} names {$related}, which is not a model; name a class extending " . Model::class . '.',
+            );
+        }
+        // Many to many through a pivot whose type column says which model a row links: a BelongsToMany whose
+        // pivot rows are those of one morph name. Post's tags link taggable_type "posts"; Tag's posts, the same.
+        if ($attribute instanceof MorphToMany || $attribute instanceof MorphedByMany) {
+            $pivot = $attribute->pivot ?? Names::plural($attribute->name);
+            $morphId = $attribute->name . '_id';
+            return new self(
+                $name,
+                $where,
+                $related,
+                $type->allowsNull(),
+                $attribute instanceof MorphToMany
+                    ? new BelongsToMany($related, $pivot, $morphId, $attribute->relatedKey ?? Names::key($related))
+                    : new BelongsToMany($related, $pivot, $attribute->key ?? Names::key($owner), $morphId),
+                pivotMorph: [$attribute->name . '_type', $attribute instanceof MorphToMany ? $owner : $related],
             );
         }
         // What the attribute leaves out is named after the models, so the rest reads one complete declaration.
@@ -190,6 +214,21 @@ final readonly class Relation
             return null;
         }
         return [$this->pair($parent, ModelMap::of($this->related))->type, $parent->morph];
+    }
+
+    /**
+     * For a many-to-many morph, the pivot's type column, with its table, and the morph name its rows hold.
+     *
+     * @return array{string, string}|null
+     */
+    public function pivotType(): ?array
+    {
+        if ($this->pivotMorph === null) {
+            return null;
+        }
+        /** @var BelongsToMany $attribute */
+        $attribute = $this->attribute;
+        return [$attribute->pivot . '.' . $this->pivotMorph[0], ModelMap::of($this->pivotMorph[1])->morph];
     }
 
     /**

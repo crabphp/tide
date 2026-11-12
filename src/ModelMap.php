@@ -266,6 +266,8 @@ final class ModelMap
                     MorphTo::class,
                     MorphOne::class,
                     MorphMany::class,
+                    MorphToMany::class,
+                    MorphedByMany::class,
                 ],
                 true,
             ));

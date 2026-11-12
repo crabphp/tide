@@ -27,7 +27,14 @@ final class Names
      */
     public static function table(string $class): string
     {
-        $name = self::snake($class);
+        return self::plural(self::snake($class));
+    }
+
+    /**
+     * A snake-case name made plural: "taggable" as "taggables", "category" as "categories".
+     */
+    public static function plural(string $name): string
+    {
         return match (true) {
             preg_match('/[^aeiou]y$/', $name) === 1 => substr($name, 0, -1) . 'ies',
             preg_match('/(s|x|z|ch|sh)$/', $name) === 1 => $name . 'es',

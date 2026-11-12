@@ -198,6 +198,32 @@ The type column holds each model's morph name: its table's name, `posts`, or `#[
 
 `with()` and `load()` read a `MorphTo` with one query per model it belongs to; a nested path past it must be a relation of each. A type the union does not list is refused, naming it and the morph names it may be. `MorphMany` and `MorphOne` work with `with()`, `load()`, `related()`, `whereHas()` and `whereDoesntHave()`, each reading only the rows whose type names this model. `whereHas()` cannot follow a `MorphTo`; condition its columns. `associate('commentable', $post)` sets the type and id columns, `associate('author', $author)` a `BelongsTo`'s key, and null points at none; `save()` writes them. `Post::morphName()` gives the name stored for a model.
 
+Many to many with models of several kinds goes through one pivot with a type column: tags on posts and on videos, in `taggables` with `taggable_type`, `taggable_id` and `tag_id`. The name, `taggable`, says the pivot and its columns:
+
+```text
+// Post and Video each declare
+#[MorphToMany(Tag::class, 'taggable')]
+public array $tags;
+
+// Tag declares
+#[MorphedByMany(Post::class, 'taggable')]
+public array $posts;
+```
+
+`pivot:`, and `relatedKey:` or `key:`, name what differs. Every read, `with()`, `related()`, `whereHas()` and the totals, keeps to the pivot rows of its own type, so post 1's tags are never video 1's.
+
+### Writing links
+
+A many-to-many relation's links, plain or polymorphic, are written on the model by the related models' keys, each change one transaction:
+
+```text
+$post->attach('tags', [$php->id]);    // links that are missing are added; one already there is left
+$post->detach('tags', [$old->id]);    // only these links are removed
+$post->sync('tags', $tagIds);         // exactly these: the missing added, the rest removed
+```
+
+They need a stored model and keys of the related key's type, unload the relation if it was loaded, and write a morph pivot's type column themselves. `sync()` locks the model's row while it compares, so two syncs of one model do not write over each other. A pivot that holds data of its own is a model of its own.
+
 ## Writing
 
 Make a model with `new`, then save it. Later saves write only changed columns:
@@ -259,6 +285,6 @@ JSON includes initialized columns and loaded relations in declaration order, wit
 
 A `#[Json]` array is compared as PHP compares arrays. An object placed inside one and changed in place is not seen as a change; assign the array again.
 
-Tide does not load on property access, maintain an identity map, validate input, soft-delete, fire model events or provide collections, many-to-many polymorphic relations or composite keys. Models belong to one request; give a job an id and read the row in the job.
+Tide does not load on property access, maintain an identity map, validate input, soft-delete, fire model events or provide collections, relations through another model or composite keys. Models belong to one request; give a job an id and read the row in the job.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for checks and [BENCHMARKS.md](BENCHMARKS.md) for measured reading costs.
