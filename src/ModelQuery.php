@@ -268,6 +268,9 @@ final class ModelQuery
         return $row === null ? null : $this->models([$row])[0];
     }
 
+    /**
+     * @return Page<T>
+     */
     public function paginate(int $perPage = 15, int $page = 1): Page
     {
         $this->assertCurrent();
@@ -282,6 +285,9 @@ final class ModelQuery
         );
     }
 
+    /**
+     * @return Page<T>
+     */
     public function simplePaginate(int $perPage = 15, int $page = 1): Page
     {
         $this->assertCurrent();
@@ -296,6 +302,9 @@ final class ModelQuery
         );
     }
 
+    /**
+     * @return CursorPage<T>
+     */
     public function cursorPaginate(int $perPage = 15, ?string $cursor = null, ?string $unique = null): CursorPage
     {
         $this->assertCurrent();
@@ -309,6 +318,9 @@ final class ModelQuery
         return new CursorPage($this->models($result->items), $result->perPage, $result->nextCursor);
     }
 
+    /**
+     * @param \Closure(list<T>): mixed $callback
+     */
     public function chunkById(int $size, \Closure $callback, string $column = 'id'): void
     {
         $this->assertCurrent();

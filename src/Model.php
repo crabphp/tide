@@ -426,6 +426,9 @@ abstract class Model implements \JsonSerializable
         return $this->storedValues !== null;
     }
 
+    /**
+     * @return ModelQuery<Model>
+     */
     public function related(string $relation): ModelQuery
     {
         $map = ModelMap::of(static::class);
