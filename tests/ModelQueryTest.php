@@ -151,7 +151,7 @@ final class ModelQueryTest extends DatabaseTestCase
                 array_keys($map->columns),
             ));
         self::assertSame($query, $query->{$method}(...$arguments));
-        // The model query names its own columns with its table, so a join after into() leaves none ambiguous.
+        // The model query names its own columns with its table.
         $qualify = static fn(mixed $column): mixed => is_string($column) && isset($map->columns[$column])
             ? $map->table . '.' . $column
             : $column;

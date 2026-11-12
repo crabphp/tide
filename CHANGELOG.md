@@ -2,15 +2,15 @@
 
 ## Unreleased
 
+- A model query returns models only; there is no `into()` handoff to records. A join, an expression or a total is the query builder's, started on the database.
 - A model query has no joins: `tap()` refuses one, even one that only filters, since one row per joined row is one model each, and every copy saves. Filter with `whereHas()`; join on the builder after `into()`.
 - **Behaviour change:** an insert writes null as NULL. A property never given a value, declared without a default, is what is left to the database's default; a `= null` default or an assigned null used to be left out too, so the row held the default while the model said null. Declare a column whose database default you want without a PHP default.
 - `insertMany()` is one transaction: a statement failing part way, a duplicate in the second of several, used to leave the earlier rows written while every model still said it was new.
 - A save that would have Tide fill in a hooked property, a database-numbered key or a kept time in an empty property, is refused before it writes: PHP cannot make such a property uninitialised again when the transaction is rolled back, and a retry reused the old key.
-- A JSON-path condition, `where('meta->colour', 'blue')`, is written with the model's table, so a join after `into()` cannot make it ambiguous.
+- A JSON-path condition, `where('meta->colour', 'blue')`, is written with the model's table.
 - `tap()` that changes the columns a model query reads is refused. A joined `id` used to replace the model's own key, so `save()` wrote another row.
 - A failed `associate()` leaves the model as it was. A refused `MorphTo` target used to have its type column set already, so the next `save()` stored the wrong owner.
-- A record query from `into()`, and a model query, cannot run after the loan they were made in, even when the same connection is lent again (with the framework's loan guard).
-- `into(Record::class)` ends a model query as records, keeping its conditions and order, for a join or an expression a model cannot hold. A model query names its own columns with its table.
+- A model query cannot run after the loan it was made in, even when the same connection is lent again (with the framework's loan guard).
 - A row with a column the model does not declare, as a join in `tap()` adds, is refused, naming the column, instead of the column being dropped unseen.
 - A model query's pages are `Page<Book>` and `CursorPage<Book>`, and `chunkById()` passes `list<Book>`, for static analysis.
 - Polymorphic relations: `#[MorphTo]` belongs to one of the models its union type lists, by a type column holding the model's morph name, its table's name or `#[Table(morph: ...)]`, and an id column. `#[MorphMany]` and `#[MorphOne]` are its other side and keep every read to their own type. `associate()` points a `BelongsTo` or `MorphTo` at a model, and `Model::morphName()` gives the name stored for it.

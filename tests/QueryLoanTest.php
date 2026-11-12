@@ -14,14 +14,6 @@ use Crab\Tide\Tests\Support\RecordingDatabase;
 use Crab\Tide\Tide;
 use PHPUnit\Framework\Attributes\DataProvider;
 
-final readonly class LoanTitle
-{
-    public function __construct(
-        public int $id,
-        public string $title,
-    ) {}
-}
-
 final class QueryLoanTest extends DatabaseTestCase
 {
     #[DataProvider('drivers')]
@@ -65,16 +57,13 @@ final class QueryLoanTest extends DatabaseTestCase
     }
 
     #[DataProvider('drivers')]
-    public function testAnEndedLoanIsNotRevivedByALaterLoanOrByInto(string $driver): void
+    public function testAnEndedLoanIsNotRevivedByALaterLoan(string $driver): void
     {
         $this->start($driver);
         $query = $this->db->run(static fn(): ModelQuery => Book::query()->where('id', 1));
-        $records = $this->db->run(static fn() => Book::query()->where('id', 1)->into(LoanTitle::class));
         foreach ([
             'a later loan of the same connection' => fn() => $this->db->run(static fn() => $query->first()),
             'a later transaction' => fn() => $this->db->transaction(static fn() => $query->get()),
-            'records after into(), outside any loan' => static fn() => $records->get(),
-            'records after into(), in a later loan' => fn() => $this->db->run(static fn() => $records->first()),
         ] as $case => $run) {
             try {
                 $run();
@@ -87,11 +76,6 @@ final class QueryLoanTest extends DatabaseTestCase
                 );
             }
         }
-        // Within its loan, into() runs as any query does.
-        self::assertSame(
-            'Alpha',
-            $this->db->run(static fn() => Book::query()->where('id', 1)->into(LoanTitle::class)->first()->title),
-        );
     }
 
     #[DataProvider('drivers')]
