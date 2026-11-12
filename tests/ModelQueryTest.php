@@ -151,6 +151,19 @@ final class ModelQueryTest extends DatabaseTestCase
                 array_keys($map->columns),
             ));
         self::assertSame($query, $query->{$method}(...$arguments));
+        // The model query names its own columns with its table, so a join after into() leaves none ambiguous.
+        $qualify = static fn(mixed $column): mixed => is_string($column) && isset($map->columns[$column])
+            ? $map->table . '.' . $column
+            : $column;
+        if (is_string($arguments[0] ?? null)) {
+            $arguments[0] = $qualify($arguments[0]);
+        } elseif (is_array($arguments[0] ?? null) && !array_is_list($arguments[0])) {
+            $arguments[0] = array_combine(array_map($qualify, array_keys($arguments[0])), $arguments[0]);
+        }
+        if (in_array($method, ['whereColumn', 'orWhereColumn'], true)) {
+            $other = isset($arguments[2]) ? 2 : 1;
+            $arguments[$other] = $qualify($arguments[$other]);
+        }
         $raw->{$method}(...$arguments);
         self::assertSame($raw->toSql(), $query->toSql());
         self::assertSame($raw->bindings(), $query->bindings());

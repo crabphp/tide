@@ -127,6 +127,7 @@ final class Relations
                 $query
                     ->builder()
                     ->addSelect($relation->attribute->pivot . '.' . $relation->attribute->key . ' as ' . $pivotAlias);
+                $query->allow($pivotAlias);
                 $match = $relation->attribute->pivot . '.' . $relation->attribute->key;
             } else {
                 $match = $related->table . '.' . $foreign->column;
@@ -134,7 +135,11 @@ final class Relations
             foreach (array_chunk(array_values($keys), self::BATCH) as $part) {
                 $batch = clone $query;
                 $batch->whereIn($match, $part);
-                foreach ($batch->builder()->get() as $row) {
+                $rows = $batch->builder()->get();
+                if ($rows !== []) {
+                    $query->assertShape($rows[0]);
+                }
+                foreach ($rows as $row) {
                     $group = $manyToMany
                         ? $local->fromColumn($row[$pivotAlias])
                         : $foreign->fromColumn($row[$foreign->column]);
@@ -222,7 +227,11 @@ final class Relations
             foreach (array_chunk(array_values($keys), self::BATCH) as $part) {
                 $batch = clone $query;
                 $batch->whereIn($related->table . '.' . $key->column, $part);
-                foreach ($batch->builder()->get() as $row) {
+                $rows = $batch->builder()->get();
+                if ($rows !== []) {
+                    $query->assertShape($rows[0]);
+                }
+                foreach ($rows as $row) {
                     $identity = $key->fromColumn($row[$key->column]);
                     $objects[$identity] ??= $query->hydrate($row);
                 }

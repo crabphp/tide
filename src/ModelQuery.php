@@ -41,6 +41,10 @@ final class ModelQuery
      * @var array<string, true> The model columns the query is ordered by, which a cursor is made of.
      */
     private array $orderColumns = [];
+    /**
+     * @var array<string, true> Columns a row may hold that are no model column, as a pivot's key.
+     */
+    private array $allowed = [];
     public readonly string $qualifier;
 
     /**
@@ -128,6 +132,72 @@ final class ModelQuery
         $this->selected = $chosen;
         $this->applySelection();
         return $this;
+    }
+
+    /**
+     * Ends the model query as records of a class of your own, for a shape a
+     * model is not: a list that joins another table, a report. Its conditions,
+     * order and limit stay; what follows is the framework's query, where
+     * joins, expressions and grouping are allowed, and the record's columns
+     * are read unless select() chooses them there:
+     *
+     *     Post::query()->where('status', 'published')
+     *         ->into(PostRow::class)
+     *         ->join('users', 'users.id', '=', 'posts.user_id')
+     *         ->select('posts.id', 'posts.title', 'users.name as author_name')
+     *         ->get();                                  // list<PostRow>
+     *
+     * On a related() query, a condition added after into() is the builder's
+     * own and is not kept within the parent.
+     *
+     * @template TRecord of object
+     * @param class-string<TRecord> $class
+     * @return Query<TRecord>
+     */
+    public function into(string $class): Query
+    {
+        $this->assertOutsideGroup('turned into records');
+        $this->assertCurrent();
+        if ($this->relations !== []) {
+            throw new \LogicException(
+                "{$this->map->class} query loads relations with with(), and a record has none; read models to load them, or join their columns after into().",
+            );
+        }
+        if ($this->selected !== null) {
+            throw new \LogicException(
+                "{$this->map->class} query chose model columns with select() or except(); a record reads its own columns, so choose them with select() after into().",
+            );
+        }
+        $query = clone $this->query;
+        return $query->select()->into($class);
+    }
+
+    /**
+     * @internal Lets rows hold a column that is no model column, as the relation loader's pivot key.
+     */
+    public function allow(string $column): void
+    {
+        $this->allowed[$column] = true;
+    }
+
+    /**
+     * @internal Refuses a row with columns the model does not read, as a join in tap() adds, instead of
+     * dropping them unseen. The first row says it for all: every row of a statement has the same columns.
+     *
+     * @param array<string, mixed> $row
+     */
+    public function assertShape(array $row): void
+    {
+        $extra = array_diff_key($row, $this->selected ?? $this->map->columns, $this->allowed);
+        if ($extra !== []) {
+            throw new \LogicException(
+                "{$this->map->class} query read "
+                . implode(', ', array_keys($extra))
+                . ', which '
+                . (count($extra) === 1 ? 'is' : 'are')
+                . ' no column of the model; a model holds only its own columns, so read the others into a record: ->into(YourRecord::class).',
+            );
+        }
     }
 
     /**
@@ -348,6 +418,9 @@ final class ModelQuery
      */
     private function models(array $rows): array
     {
+        if ($rows !== []) {
+            $this->assertShape($rows[0]);
+        }
         $models = array_map($this->hydrate(...), $rows);
         $this->loadRelations($models);
         return $models;
@@ -684,7 +757,8 @@ final class ModelQuery
      */
     private function named(string $column): string
     {
-        return $this->qualified && isset($this->map->columns[$column]) ? $this->qualifier . '.' . $column : $column;
+        // Always with its table, so that a join after into() cannot make it ambiguous.
+        return isset($this->map->columns[$column]) ? $this->qualifier . '.' . $column : $column;
     }
 
     /**
@@ -697,7 +771,7 @@ final class ModelQuery
 
     private function condition(string $method, array $arguments): void
     {
-        if ($this->qualified && $arguments !== []) {
+        if ($arguments !== []) {
             if (is_string($arguments[0])) {
                 $arguments[0] = $this->named($arguments[0]);
             } elseif (is_array($arguments[0]) && !array_is_list($arguments[0])) {

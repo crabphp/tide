@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- `into(Record::class)` ends a model query as records, keeping its conditions and order, for a join or an expression a model cannot hold. A model query names its own columns with its table.
+- A row with a column the model does not declare, as a join in `tap()` adds, is refused, naming the column, instead of the column being dropped unseen.
 - A model query's pages are `Page<Book>` and `CursorPage<Book>`, and `chunkById()` passes `list<Book>`, for static analysis.
 - Polymorphic relations: `#[MorphTo]` belongs to one of the models its union type lists, by a type column holding the model's morph name, its table's name or `#[Table(morph: ...)]`, and an id column. `#[MorphMany]` and `#[MorphOne]` are its other side and keep every read to their own type. `associate()` points a `BelongsTo` or `MorphTo` at a model, and `Model::morphName()` gives the name stored for it.
 - `select()` and `except()` on a model query read some of a model's columns. The others are left uninitialised, so reading one fails instead of giving a default or a null, JSON leaves them out and `save()` writes only what changed. The key, the keys relations are matched by and a cursor page's order columns are always read. A model is no longer always a whole row.

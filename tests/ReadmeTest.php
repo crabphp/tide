@@ -38,7 +38,7 @@ final class ReadmeTest extends DatabaseTestCase
             preg_match('/\A\/\/ ([a-z-]+\.php)\n/', $block, $name);
             $blocks[$name[1]] = $block;
         }
-        self::assertCount(12, $blocks, 'Every PHP block needs a runnable example name.');
+        self::assertCount(13, $blocks, 'Every PHP block needs a runnable example name.');
         // Separate namespaces allow the exact declarations to run on every driver.
         $namespace = 'TideReadme' . bin2hex(random_bytes(6));
         $directory = sys_get_temp_dir() . '/tide-readme-' . bin2hex(random_bytes(6));
@@ -51,14 +51,27 @@ final class ReadmeTest extends DatabaseTestCase
             $source =
                 "<?php\ndeclare(strict_types=1);\nnamespace {$namespace};\n"
                 . implode("\n", $blocks)
-                . "\nreturn [\$books, \$page, \$recent, \$json, \$copy, \$count, \$grace, \$titles, \$light, \$commented, \$owners];\n";
+                . "\nreturn [\$books, \$page, \$recent, \$json, \$copy, \$count, \$grace, \$titles, \$light, \$commented, \$owners, \$rows];\n";
             file_put_contents($directory . '/examples.php', $source);
-            [$books, $page, $recent, $json, $copy, $count, $grace, $titles, $light, $commented, $owners] = require
-                $directory . '/examples.php';
+            [
+                $books,
+                $page,
+                $recent,
+                $json,
+                $copy,
+                $count,
+                $grace,
+                $titles,
+                $light,
+                $commented,
+                $owners,
+                $rows,
+            ] = require $directory . '/examples.php';
             self::assertSame('{"id":1,"title":"PHP"}', json_encode($titles[0], JSON_THROW_ON_ERROR));
             self::assertSame('PHP', $light->title);
             self::assertSame('First!', $commented[0]->comments[0]->body);
             self::assertSame('Hello', $owners[0]->commentable->title);
+            self::assertSame('First', $rows[0]->author);
             self::assertCount(1, $books);
             self::assertCount(1, $page);
             self::assertCount(1, $recent);

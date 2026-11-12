@@ -41,6 +41,8 @@ final class PackageBoundaryTest extends TestCase
         // A model query may read some of its own columns; it never reads another shape.
         self::assertTrue(method_exists(ModelQuery::class, 'select'));
         self::assertTrue(method_exists(ModelQuery::class, 'except'));
+        // A shape a model is not is a record's: into() ends the model query as the framework's.
+        self::assertTrue(method_exists(ModelQuery::class, 'into'));
         foreach ([
             'addSelect',
             'selectRaw',
@@ -49,7 +51,6 @@ final class PackageBoundaryTest extends TestCase
             'join',
             'groupBy',
             'having',
-            'into',
         ] as $method) {
             self::assertFalse(method_exists(ModelQuery::class, $method));
         }

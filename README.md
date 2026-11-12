@@ -101,7 +101,24 @@ $titles = Book::query()->select('title')->orderBy('id')->get();
 $light = Book::query()->except('internal_note')->find(1);
 ```
 
-The other columns are left uninitialised: reading one is PHP's error, never a default or a null that looks like the row's value. JSON leaves them out, `save()` writes only what changed, an unread column you assign is written, and `refresh()` reads the whole row. The key is always read, and so are the keys the query's relations are matched by and the columns a cursor page is ordered by. A column with a hook and a default is always read too, since PHP cannot leave it uninitialised. A column the model does not declare, a join or an expression is a record's.
+The other columns are left uninitialised: reading one is PHP's error, never a default or a null that looks like the row's value. JSON leaves them out, `save()` writes only what changed, an unread column you assign is written, and `refresh()` reads the whole row. The key is always read, and so are the keys the query's relations are matched by and the columns a cursor page is ordered by. A column with a hook and a default is always read too, since PHP cannot leave it uninitialised. A column the model does not declare, a join or an expression is a record's. `into()` ends a model query as records of a class of yours, keeping its conditions and order; what follows is the framework's query, where joins and expressions are allowed:
+
+```php
+// into.php
+final readonly class BookRow
+{
+    public function __construct(public int $id, public string $title, public ?string $author) {}
+}
+
+$rows = Book::query()
+    ->where('title', 'like', '%PHP%')
+    ->into(BookRow::class)
+    ->leftJoin('authors', 'authors.id', '=', 'books.author_id')
+    ->select('books.id', 'books.title', 'authors.name as author')
+    ->get();   // list<BookRow>
+```
+
+A model query names its own columns with its table, so a join after `into()` leaves none ambiguous. `tap()` is for what keeps a model's shape, a condition or a lock: a row with a column the model does not declare, as a join in `tap()` adds, is refused, naming the column, never dropped unseen.
 
 `simplePaginate()`, `cursorPaginate()` and `chunkById()` also return models. Cursor pagination and chunking default to the declared key and require one when their column is omitted. `chunkById()` reads in ascending order of that column and refuses an existing order; remove `orderBy()` before calling it. Aggregates, `value()` and `pluck()` return plain database values. Query execution leaves the query unchanged; clone it to branch. `when()` receives the model query. `tap()` receives the framework's `Query` for operations not forwarded; a partial selection fails when it cannot make a whole model row.
 
