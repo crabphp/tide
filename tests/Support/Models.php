@@ -9,10 +9,13 @@ use Crab\Database\ColumnName;
 use Crab\Database\Json;
 use Crab\Tide\BelongsTo;
 use Crab\Tide\BelongsToMany;
+use Crab\Tide\Count;
+use Crab\Tide\Factory;
 use Crab\Tide\HasMany;
 use Crab\Tide\HasOne;
 use Crab\Tide\Hidden;
 use Crab\Tide\Model;
+use Crab\Tide\ModelQuery;
 use Crab\Tide\Table;
 
 enum Status: string
@@ -28,9 +31,13 @@ final class Author extends Model
     public string $name;
     #[HasMany(Book::class, 'author_id')]
     public array $books;
+    #[Count('books')]
+    public int $books_count;
+    #[Count('books')]
+    public int $popular_books_count;
 }
 
-#[Table('tide_books')]
+#[Table('tide_books', query: BookQuery::class)]
 final class Book extends Model
 {
     public int $id;
@@ -52,6 +59,10 @@ final class Book extends Model
     public ?Isbn $isbn;
     #[BelongsToMany(Tag::class, 'tide_book_tag', 'book_id', 'tag_id')]
     public array $tags;
+    #[Count('chapters')]
+    public int $chapters_count;
+    #[Count('tags')]
+    public int $tags_count;
 
     public function __construct(string $title = 'New book', ?int $authorId = null)
     {
@@ -107,6 +118,8 @@ final class Category extends Model
     public ?Category $parent;
     #[HasMany(self::class, 'parent_id')]
     public array $children;
+    #[Count('children')]
+    public int $children_count;
 }
 
 final class Money
@@ -136,4 +149,31 @@ final class Price extends Model
     public int $id;
     #[AsMoney]
     public Money $amount;
+}
+
+/**
+ * @extends ModelQuery<Book>
+ */
+final class BookQuery extends ModelQuery
+{
+    public function popular(int $votes = 3): static
+    {
+        return $this->where('votes', '>=', $votes);
+    }
+
+    public function by(Author $author): static
+    {
+        return $this->where('author_id', $author->id);
+    }
+}
+
+/**
+ * @extends Factory<Book>
+ */
+final class BookFactory extends Factory
+{
+    protected function definition(int $sequence): Book
+    {
+        return new Book("Made {$sequence}");
+    }
 }

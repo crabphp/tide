@@ -293,7 +293,7 @@ final class Relations
                 $alias = 'tide_related_' . $depth++;
             } while (in_array($alias, $ancestors, true));
         }
-        $query = new ModelQuery($related, $parent->database, $parent->connection, $alias);
+        $query = $related->query($parent->database, $parent->connection, $alias);
         if ($rest === null && $constraint !== null) {
             $query->constrain($constraint);
         }
@@ -337,9 +337,9 @@ final class Relations
     {
         $parent->assertCurrent();
         if ($parent->map->database === $related->database) {
-            return new ModelQuery($related, $parent->database, $parent->connection);
+            return $related->query($parent->database, $parent->connection);
         }
-        return new ModelQuery($related, Tide::database($related->database));
+        return $related->query(Tide::database($related->database));
     }
 
     private static function value(ModelMap $map, Model $model, string $property, Relation $relation): int|string|null

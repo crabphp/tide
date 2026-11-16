@@ -5,8 +5,9 @@ declare(strict_types=1);
 namespace Crab\Tide;
 
 /**
- * A model's table, its key, its database, and its morph name: what a
- * #[MorphTo] type column holds for it, the table's name unless said.
+ * A model's table, its key, its database, its morph name: what a
+ * #[MorphTo] type column holds for it, the table's name unless said, and
+ * the ModelQuery subclass its queries are made of, for scopes of its own.
  */
 #[\Attribute(\Attribute::TARGET_CLASS)]
 final readonly class Table
@@ -16,6 +17,8 @@ final readonly class Table
         public string $key = 'id',
         public ?string $database = null,
         public ?string $morph = null,
+        /** @var class-string<ModelQuery>|null */
+        public ?string $query = null,
     ) {
         if ($name !== null) {
             Table::identifier($name, self::class . '::$name');

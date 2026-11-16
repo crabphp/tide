@@ -35,9 +35,12 @@ A model extends `Model` and declares its columns as typed properties. A construc
 
 ```php
 // models.php
+use Crab\Tide\Count;
 use Crab\Tide\HasMany;
 use Crab\Tide\Hidden;
 use Crab\Tide\Model;
+use Crab\Tide\ModelQuery;
+use Crab\Tide\Table;
 
 final class Author extends Model
 {
@@ -46,9 +49,13 @@ final class Author extends Model
     #[HasMany(Book::class)]
     public array $books;
 
+    #[Count('books')]
+    public int $books_count;
+
     public function __construct(public string $name) {}
 }
 
+#[Table(query: BookQuery::class)]
 final class Book extends Model
 {
     public int $id;
@@ -79,7 +86,7 @@ The plural is made with `s`, `es` or `ies`. A word English makes plural another 
 
 Public, backed properties are columns; private, protected, static and virtual properties are not. Columns accept the framework's record types and casts, including backed enums, `DateTimeImmutable`, `#[Json]` arrays and custom `Cast` attributes. `#[ColumnName('created_at')]` maps another column name. Persistence reads and writes raw column values without running hooks, including stored keys and relation matching. Application reads and writes still run their hooks, and JSON uses the getter's view. Columns with `public private(set)` or `public protected(set)` are supported; readonly columns are refused. Relations must be plain public properties without hooks or asymmetric setter visibility.
 
-`#[Table('books', key: 'uuid', database: 'reports')]` names the table, another key column and a configured database; each part is optional. Table, pivot and key names are identifiers, not SQL. A model without a key can be read, but cannot be found by key, saved, deleted, refreshed or queried through `related()`.
+`#[Table('books', key: 'uuid', database: 'reports', query: BookQuery::class)]` names the table, another key column, a configured database and the model's own query class; each part is optional. Table, pivot and key names are identifiers, not SQL. A model without a key can be read, but cannot be found by key, saved, deleted, refreshed or queried through `related()`.
 
 ## Reading
 
@@ -93,7 +100,12 @@ $book = Book::findOrFail(1);                                                    
 $page = Book::query()->orderBy('id')->paginate(20);
 $count = Book::query()->where('author_id', 1)->count();
 $titles = Book::query()->whereHas('author')->orderBy('id')->pluck('title', 'id');   // [1 => 'PHP']
+$newest = Book::query()->latest()->first();                                         // by created_at
+$counted = Author::query()->withCount('books')->get();                              // $author->books_count
+$found = Book::query()->where('title', 'PHP')->firstOrCreate(fn () => new Book('PHP', 1));
 ```
+
+`latest()` and `oldest()` order by the model's creation time, or the column given. `firstOrNew()`, `firstOrCreate()` and `updateOrCreate()` take a closure that makes the new model with `new`, used only when no row matches: the first returns it unsaved, the second saves it, and the third changes the found or made model with a second closure and saves it. The closure gives the model what the conditions ask for. Two requests at once can both find no row; a unique index is what keeps them to one.
 
 A query reads every column the model declares, named one by one, never `*`. `select()` reads only the ones it names, and `except()` every one but those:
 
@@ -106,6 +118,29 @@ $light = Book::query()->except('internal_note')->find(1);
 The other columns are left uninitialised: reading one is PHP's error, never a default or a null that looks like the row's value. JSON leaves them out, `save()` writes only what changed, an unread column you assign is written, and `refresh()` reads the whole row. The key is always read, and so are the keys the query's relations are matched by, the columns a cursor page is ordered by, and a column with a hook and a default, which PHP cannot leave uninitialised.
 
 `simplePaginate()`, `cursorPaginate()` and `chunkById()` return models too; cursor pagination and chunking go by the key unless given a column, and `chunkById()` refuses an existing order. Running a query leaves it unchanged; clone it to branch.
+
+### Scopes
+
+Conditions a model's queries use again are methods of its own query class, named in `#[Table(query: ...)]`. Every query of the model is one, `Book::query()`, `$author->related('books')` and the query a `with()` or `whereHas()` closure is given, so the methods chain anywhere, with real signatures:
+
+```php
+// scopes.php
+/** @extends ModelQuery<Book> */
+final class BookQuery extends ModelQuery
+{
+    public function titled(string $word): static
+    {
+        return $this->where('title', 'like', "%{$word}%");
+    }
+
+    public function by(Author $author): static
+    {
+        return $this->where('author_id', $author->id);
+    }
+}
+
+$scoped = Book::query()->by(Author::findOrFail(1))->titled('PHP')->latest()->get();
+```
 
 ### What is the query builder's
 
@@ -136,7 +171,6 @@ Declare a relation outside the constructor with no default. Reading it before lo
 
 ```php
 // relations.php
-use Crab\Tide\ModelQuery;
 
 $books = Book::query()->with('author')->orderBy('id')->get();
 Book::load($books, 'author');
@@ -170,6 +204,12 @@ final class Post extends Model
 
     #[MorphMany(Comment::class)]
     public array $comments;
+
+    #[Count('comments')]
+    public int $comments_count;
+
+    #[Count('comments')]
+    public int $long_comments_count;
 
     public function __construct(public string $title) {}
 }
@@ -213,6 +253,19 @@ public array $posts;
 
 `pivot:`, and `relatedKey:` or `key:`, name what differs. Every read, `with()`, `related()`, `whereHas()` and the totals, keeps to the pivot rows of its own type, so post 1's tags are never video 1's.
 
+### Counts
+
+A `#[Count('comments')]` property, `public int $comments_count;`, holds how many related rows a relation has. `withCount('comments')` reads it with a subquery in the same statement, for every model on the page. It is no column: `save()` never writes it, and until a query asks for it it is uninitialised, so reading it fails instead of giving 0. JSON includes it once read. A count with a condition has a property of its own, `#[Count('comments')] public int $long_comments_count;` on the `Post` above, named to `withCount()` with the condition after it:
+
+```php
+// counts.php
+$posts = Post::query()
+    ->withCount('comments_count', 'long_comments_count', fn (ModelQuery $query) => $query->where('body', 'like', '%!%'))
+    ->get();   // $posts[0]->comments_count, $posts[0]->long_comments_count
+```
+
+Where a relation has one count, its name is enough, `withCount('books')`; with several, name the property. A count works with `select()`, on pages, and in a relation's constraint: `with('books', fn (BookQuery $query) => $query->withCount('comments'))`.
+
 ### Writing links
 
 A many-to-many relation's links, plain or polymorphic, are written on the model by the related models' keys, each change one transaction:
@@ -236,12 +289,18 @@ $author->save();
 $book = new Book('PHP models', $author->id);
 $book->save();
 $book->title = 'Typed PHP models';
+$changed = $book->isDirty('title');                 // true; $book->original('title') is 'PHP models'
 $book->save();
+$book->save(['title' => 'Typed models', 'author_id' => $author->id]);
 $book->refresh();
 $copy = clone $book;
 $book->delete();
 $book->save();
 ```
+
+`save()` given values assigns them first, as one change: each must be one of the model's columns, and a value of the wrong type is PHP's `TypeError` with nothing assigned. Name the keys yourself. Input passed whole, `$request->all()`, would let a client write any column, `is_admin` for one.
+
+`isDirty()` says whether the model has changes `save()` would write, of any column or of those named; `dirty()` gives them by property, and `original('title')` a column's value as it was read or last saved. A new model's every column with a value is a change.
 
 A model that declares `created_at` and `updated_at` as dates has them kept, in PHP's default time zone, the one they are read back in: both when it is first saved, and `updated_at` at each change. A time you set yourself is written as you set it, and a save that changes nothing writes nothing. The time is the application's clock, to the second.
 
@@ -274,6 +333,27 @@ A nested transaction on the callback's connection uses a savepoint. A nested cal
 Only model calls follow the transaction. A query builder call on the database itself, `$database->table(...)`, still borrows another connection and runs outside it; inside a transaction use the connection the callback is given, or `$database->current()`.
 
 When a transaction is rolled back, the models saved or deleted in it are again what the database holds: a new model is new, with its generated key emptied, and a stored one has the values it had. So the same callback can be run again, after a deadlock for one, and writes them again, with the times of the attempt that commits. The properties keep what you assigned; what Tide filled in, a generated key or a kept time, goes back to what it was. When a commit fails without saying whether it happened, as when the connection is lost while the database answers, the models are left as stored: check the row before saving them again.
+
+## Factories
+
+A factory says once how a plausible model is made, for tests and seeders. A test changes only what it is about: properties by name or with a closure, and the owner by a `BelongsTo`. The sequence number counts the factory's models from 1, for values that must differ. A factory is never changed; each method returns a new one:
+
+```php
+// factories.php
+use Crab\Tide\Factory;
+
+/** @extends Factory<Book> */
+final class BookFactory extends Factory
+{
+    protected function definition(int $sequence): Book
+    {
+        return new Book("Book {$sequence}", null);
+    }
+}
+
+$made = BookFactory::new()->count(2)->for('author', $author)->state(['internal_note' => 'seeded'])->create();
+$draft = BookFactory::new()->state(fn (Book $book) => $book->title .= ' (draft)')->makeOne();   // not saved
+```
 
 ## JSON and limits
 

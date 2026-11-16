@@ -20,7 +20,7 @@ abstract class Model implements \JsonSerializable
     public static function query(): ModelQuery
     {
         $map = ModelMap::of(static::class);
-        return new ModelQuery($map, Tide::database($map->database));
+        return $map->query(Tide::database($map->database));
     }
 
     public static function find(int|string $id): ?static
@@ -55,14 +55,26 @@ abstract class Model implements \JsonSerializable
                 . '::load() received a new model; save it before loading relations.');
             }
         }
-        $query = new ModelQuery($map, Tide::database($map->database));
+        $query = $map->query(Tide::database($map->database));
         Relations::load($query, $models, Relations::tree($map, $relations));
     }
 
-    public function save(): static
+    /**
+     * Inserts a new model, or writes what changed on a stored one. Values given
+     * are assigned first, by property, as one change: ['title' => 'Beta'].
+     * Each must be one of the model's columns, and a value of the wrong type
+     * leaves the model as it was. Name the keys yourself: input passed whole,
+     * $request->all(), would let a client write any column.
+     *
+     * @param array<string, mixed> $values
+     */
+    public function save(array $values = []): static
     {
         $map = ModelMap::of(static::class);
         $key = $map->requireKey();
+        if ($values !== []) {
+            $this->fill($map, $values);
+        }
         $values = $map->values($this);
         if ($this->storedValues === null) {
             [$written, $givenKey, $stamps, $before] = $this->insertion($map, $key, $values);
@@ -71,23 +83,11 @@ abstract class Model implements \JsonSerializable
             $this->inserted($map, $key, $connection, $givenKey, $stamps, $before, $id);
             return $this;
         }
-        $written = $changed = [];
-        foreach ($values as $name => $value) {
+        $written = [];
+        $changed = $this->changes($map, $values);
+        foreach ($changed as $name => $_) {
             $field = $map->fields[$name];
-            $snapshot = $map->snapshot($field, $value);
-            $present = array_key_exists($name, $this->storedValues);
-            $same =
-                $present
-                && (
-                    $value instanceof \DateTimeInterface && $field->cast === null
-                        ? ($snapshot <=> $this->storedValues[$name]) === 0
-                        : $snapshot === $this->storedValues[$name]
-                );
-            if ($same) {
-                continue;
-            }
-            $written[$field->column] = $field->toColumn($value);
-            $changed[$name] = $snapshot;
+            $written[$field->column] = $field->toColumn($values[$name]);
         }
         if ($changed === []) {
             return $this;
@@ -134,6 +134,132 @@ abstract class Model implements \JsonSerializable
             unset($this->{$name});
         }
         return $this;
+    }
+
+    /**
+     * Whether the model has changes save() would write: of any column, or of
+     * those named. A new model's every column with a value is a change.
+     */
+    public function isDirty(string ...$properties): bool
+    {
+        $dirty = $this->dirty();
+        if ($properties === []) {
+            return $dirty !== [];
+        }
+        $map = ModelMap::of(static::class);
+        foreach ($properties as $name) {
+            self::column($map, $name, 'isDirty');
+            if (array_key_exists($name, $dirty)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * The changes save() would write, by property, with their new values.
+     *
+     * @return array<string, mixed>
+     */
+    public function dirty(): array
+    {
+        $map = ModelMap::of(static::class);
+        $values = $map->values($this);
+        return $this->storedValues === null ? $values : array_intersect_key($values, $this->changes($map, $values));
+    }
+
+    /**
+     * A column's value as it was read or last saved, before the changes since.
+     */
+    public function original(string $property): mixed
+    {
+        $map = ModelMap::of(static::class);
+        $field = self::column($map, $property, 'original');
+        if ($this->storedValues === null) {
+            throw new \LogicException(static::class . '::original() has nothing for a new model; save it first.');
+        }
+        if (!array_key_exists($property, $this->storedValues)) {
+            throw new \LogicException(
+                static::class
+                . "::original('{$property}') has no value: the query did not read it; leave it out of except(), or name it in select().",
+            );
+        }
+        $stored = $this->storedValues[$property];
+        // A cast's object is kept as the value it writes, so that a change made inside it shows.
+        $type = new \ReflectionProperty($this, $property)->getType();
+        $object = !$type instanceof \ReflectionNamedType || !$type->isBuiltin();
+        return $field->cast !== null && $object && $stored !== null ? $field->fromColumn($stored) : $stored;
+    }
+
+    /**
+     * What changed since the model was read or saved, by property, as snapshots.
+     *
+     * @param array<string, mixed> $values The model's initialised columns.
+     * @return array<string, mixed>
+     */
+    private function changes(ModelMap $map, array $values): array
+    {
+        $changed = [];
+        foreach ($values as $name => $value) {
+            $field = $map->fields[$name];
+            $snapshot = $map->snapshot($field, $value);
+            $same =
+                array_key_exists($name, $this->storedValues ?? [])
+                && (
+                    $value instanceof \DateTimeInterface && $field->cast === null
+                        ? ($snapshot <=> $this->storedValues[$name]) === 0
+                        : $snapshot === $this->storedValues[$name]
+                );
+            if (!$same) {
+                $changed[$name] = $snapshot;
+            }
+        }
+        return $changed;
+    }
+
+    /**
+     * Assigns values given to save(), all or none.
+     *
+     * @param array<string, mixed> $values
+     */
+    private function fill(ModelMap $map, array $values): void
+    {
+        foreach ($values as $name => $_) {
+            $field = self::column($map, (string) $name, 'save');
+            if ($map->restricted($field->property)) {
+                throw new \LogicException(
+                    static::class
+                    . "::save() cannot assign \${$name}, which is private(set) or protected(set); assign it as the class allows.",
+                );
+            }
+        }
+        $before = [];
+        try {
+            foreach ($values as $name => $value) {
+                $before[$name] = $map->initialized($this, $name) ? [$map->value($this, $name)] : null;
+                $this->{$name} = $value;
+            }
+        } catch (\TypeError $error) {
+            foreach ($before as $name => $was) {
+                $was === null ? $map->forget($this, $name) : $map->assign($this, $name, $was[0]);
+            }
+            throw $error;
+        }
+    }
+
+    /**
+     * A property named to a method that takes the model's columns.
+     */
+    private static function column(ModelMap $map, string $property, string $method): Field
+    {
+        return (
+            $map->fields[$property] ?? throw new \LogicException(
+                static::class
+                . "::{$method}() names \"{$property}\", which is not one of its columns; name "
+                . implode(', ', array_keys($map->fields))
+                . '.',
+            )
+        );
     }
 
     /**
@@ -414,7 +540,7 @@ abstract class Model implements \JsonSerializable
         if (!$this->stored()) {
             throw new \LogicException(static::class . '::related() needs a stored model; save it first.');
         }
-        return Relations::query(new ModelQuery($map, Tide::database($map->database)), $this, $map->relation($relation));
+        return Relations::query($map->query(Tide::database($map->database)), $this, $map->relation($relation));
     }
 
     public function jsonSerialize(): array

@@ -7,6 +7,7 @@
 - [Relations](#relations)
 - [Writing](#writing)
 - [Transactions](#transactions)
+- [Factories for tests](#factories-for-tests)
 - [JSON for APIs](#json-for-apis)
 - [When not to use a model](#when-not-to-use-a-model)
 - [What is not there](#what-is-not-there)
@@ -75,6 +76,7 @@ $taken    = Account::query()->where('email', $email)->exists();
 $total    = Order::query()->where('user_id', $user->id)->sum('total');                 // int
 $names    = Product::query()->orderBy('name')->pluck('name', 'id');                   // [id => name]
 $last     = Order::query()->max('created_at');                                        // ?DateTimeImmutable
+$recent   = Order::query()->where('user_id', $user->id)->latest()->limit(10)->get();  // newest first, by created_at
 ```
 
 `findOrFail()` and `firstOrFail()` throw `ModelNotFound` when no row matches. It is an `HttpError`, so an action that lets it through answers 404 with "No such product.", which names the model in words and never its class or the key. Where a missing row means something else, a 401 at sign-in, a 422 for an id in a form, write the status yourself: `find($id) ?? throw new HttpException(422, 'Choose a product from the list.')`.
@@ -85,23 +87,57 @@ The conditions are the query builder's, `where`, `whereIn`, `whereBetween`, `whe
 
 A list is a PHP array of models. `paginate()`, `simplePaginate()` and `cursorPaginate()` give a `Page` whose `items` are models, and `chunkById()` walks a large table.
 
-A query used in several places is a static method of the model. The sample's catalogue, home page, admin list and API all read through one:
+Conditions used in several places are methods of the model's own query class, its scopes. The model names it, and every query of the model is one, a relation's and a `with()` closure's included, so they chain in any order:
 
 ```php
-public static function search(ProductSearch $search): ModelQuery
+#[Table(query: ProductQuery::class)]
+final class Product extends Model { /* ... */ }
+
+/** @extends ModelQuery<Product> */
+final class ProductQuery extends ModelQuery
 {
-    $query = self::query()->orderBy('name');
-    if ($search->q !== '') {
-        $query->where('name', 'like', "%{$search->q}%");
+    public function inStock(): static
+    {
+        return $this->where('stock', '>', 0);
     }
-    if ($search->category !== null) {
-        $query->where('category', $search->category);
+
+    public function matching(ProductSearch $search): static
+    {
+        if ($search->q !== '') {
+            $this->where('name', 'like', "%{$search->q}%");
+        }
+        if ($search->category !== null) {
+            $this->where('category', $search->category);
+        }
+        return $this;
     }
-    return $query;
 }
 
-$page = Product::search($search)->paginate($search->perPage, $search->page);
+$page = Product::query()->matching($search)->inStock()->orderBy('name')->paginate($search->perPage, $search->page);
 ```
+
+A list that shows how many related rows each model has reads them with `withCount()`, into a `#[Count]` property, in the same statement:
+
+```php
+#[Count('products')]
+public int $products_count;                    // on Category, beside #[HasMany(Product::class)] public array $products;
+
+$categories = Category::query()->withCount('products')->orderBy('name')->get();
+```
+
+The property is uninitialised until a query asks for it, and never saved. A count with a condition has a property of its own: `withCount('products_count', 'in_stock_count', fn (ProductQuery $q) => $q->inStock())`.
+
+A row found by a natural key, or made when there is none, is one call. The closure makes the new model with `new`, and runs only when no row matches:
+
+```php
+$customer = Customer::query()->where('email', $email)->firstOrCreate(fn () => new Customer($email));
+$setting  = Setting::query()->where('name', 'currency')->updateOrCreate(
+    fn () => new Setting('currency'),
+    fn (Setting $setting) => $setting->value = 'EUR',
+);
+```
+
+`firstOrNew()` returns the new model unsaved. Two requests at once can both find no row; a unique index on the column keeps them to one.
 
 A list that needs only some of a model's columns says so, and gets models with the rest uninitialised:
 
@@ -110,7 +146,7 @@ $page = Product::query()->select('name', 'price')->orderBy('name')->paginate(20)
 $product = Product::query()->except('description')->find($id);
 ```
 
-A grouped report, a total of an expression or columns of several tables is the query builder's, with an `into()` record for its shape; the sample's order list, daily report and category counts are.
+A grouped report, a total of an expression or columns of several tables is the query builder's, with an `into()` record for its shape; the sample's order list and daily report are.
 
 ## Relations
 
@@ -215,9 +251,26 @@ $product->save();                              // $product->id is set
 $product->stock = 35;
 $product->save();
 
+// Several properties and the save in one line
+$product->save(['name' => 'Sencha', 'price' => 520]);
+
 $product->refresh();                           // read again from the database
 $product->delete();
 ```
+
+`save()` given values takes only the model's columns, and a value of the wrong type is a `TypeError` with nothing assigned. Name the keys from the form's validated values, never the request's input whole: a client would choose the columns, `is_admin` among them.
+
+What a change is about to write can decide what else happens, as an email when an order ships, without events:
+
+```php
+$shipped = $order->isDirty('status') && $order->status === OrderStatus::Shipped;
+$order->save();
+if ($shipped) {
+    $this->mail->send(new OrderShipped($order));
+}
+```
+
+`dirty()` gives the changes by property, and `original('status')` the value as it was read.
 
 Several models are saved with `save()` for each, in a transaction. Rows written many at once, an import, a counter, the lines of an order, are the query builder's: `$db->table('products')->where('stock', '<', 10)->increment('stock', 60)` is one statement. It does not change models already held.
 
@@ -239,6 +292,31 @@ When the transaction is rolled back, a deadlock for one, the models saved or del
 
 - The query builder does not follow the transaction by itself: in one, write `$tx->table(...)`, not `$db->table(...)`.
 - Start a query where it runs: one started inside a transaction and run after it ends is refused.
+
+## Factories for tests
+
+A factory says once how a plausible model is made, so that a test writes only what it is about:
+
+```php
+/** @extends Factory<Product> */
+final class ProductFactory extends Factory
+{
+    protected function definition(int $sequence): Product
+    {
+        $product = new Product();
+        $product->sku = "SKU-{$sequence}";             // unique: the sequence counts this factory's models
+        $product->name = "Product {$sequence}";
+        $product->price = 1000;
+        return $product;
+    }
+}
+
+$products = ProductFactory::new()->count(3)->state(['stock' => 0])->create();   // list<Product>, saved
+$line     = OrderLineFactory::new()->for('order', $order)->createOne();          // by its BelongsTo
+$draft    = ProductFactory::new()->state(fn (Product $p) => $p->price = 0)->makeOne();   // not saved
+```
+
+Each method returns a new factory, so one built in `setUp()` can be shared.
 
 ## JSON for APIs
 
@@ -265,7 +343,7 @@ For another shape, give the model a method; the sample's `Product::summary()` is
 ## What is not there
 
 - Loading a relation by reading it: `$order->lines` never runs a query.
-- Events, observers and global scopes: what happens is written where it happens.
+- Events, observers and global scopes: what happens is written where it happens, with `isDirty()` where it depends on a change. A scope is a method you call.
 - Soft deletes: a column of your own, and a condition on it.
 - A collection class: a list is a PHP array.
 - Relations through another model, and keys of several columns.

@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Crab\Tide;
 
 use Crab\Contracts\Database\Cast;
+use Crab\Contracts\Database\Connection;
+use Crab\Contracts\Database\Database;
 use Crab\Contracts\Database\Field;
 use Crab\Database\ColumnName;
 
@@ -47,6 +49,8 @@ final class ModelMap
      * @param array<string, true> $hidden
      * @param array<string, \ReflectionProperty> $setters
      * @param array<string, \ReflectionProperty> $readers
+     * @param array<string, string> $counts The #[Count] properties, with the relation each counts.
+     * @param class-string<ModelQuery> $queryClass
      */
     private function __construct(
         public readonly string $class,
@@ -63,6 +67,8 @@ final class ModelMap
         public readonly ?Field $createdAt = null,
         public readonly ?Field $updatedAt = null,
         public readonly string $morph = '',
+        public readonly array $counts = [],
+        public readonly string $queryClass = ModelQuery::class,
     ) {
         $this->reflection = new \ReflectionClass($class);
         $plain = true;
@@ -90,6 +96,16 @@ final class ModelMap
     public static function of(string $class): self
     {
         return self::$maps[$class] ??= self::inspect($class);
+    }
+
+    /**
+     * A query of this model, of the class #[Table(query: ...)] names.
+     *
+     * @return ModelQuery<Model>
+     */
+    public function query(Database $database, ?Connection $connection = null, ?string $alias = null): ModelQuery
+    {
+        return new $this->queryClass($this, $database, $connection, $alias);
     }
 
     public function requireKey(): Field
@@ -210,6 +226,14 @@ final class ModelMap
         return $this->readers[$name]->hasHooks();
     }
 
+    /**
+     * Whether a property may be assigned only inside its class, by private(set) or protected(set).
+     */
+    public function restricted(string $name): bool
+    {
+        return $this->readers[$name]->isPrivateSet() || $this->readers[$name]->isProtectedSet();
+    }
+
     public function initialized(Model $model, string $name): bool
     {
         return $this->readers[$name]->isInitialized($model);
@@ -250,7 +274,7 @@ final class ModelMap
         $attributes = $reflection->getAttributes(Table::class);
         $table = $attributes === [] ? new Table() : $attributes[0]->newInstance();
         $tableName = $table->name ?? Names::table($class);
-        $fields = $columns = $relations = $hidden = $setters = $readers = [];
+        $fields = $columns = $relations = $hidden = $setters = $readers = $counts = [];
         $properties = [];
         foreach (self::properties($reflection) as $name => $property) {
             if ($property->isStatic()) {
@@ -280,6 +304,36 @@ final class ModelMap
                 $hidden[$name] = true;
             }
             $where = "{$class}::\${$name}";
+            $countAttributes = $property->getAttributes(Count::class);
+            if ($countAttributes !== []) {
+                if (
+                    $relationAttributes !== []
+                    || $property->getAttributes(ColumnName::class) !== []
+                    || $property->getAttributes(Cast::class, \ReflectionAttribute::IS_INSTANCEOF) !== []
+                ) {
+                    throw new \LogicException(
+                        "{$where} is a #[Count], which is no column and no relation; remove its other attributes.",
+                    );
+                }
+                $type = $property->getType();
+                if (
+                    !$type instanceof \ReflectionNamedType
+                    || $type->getName() !== 'int'
+                    || $type->allowsNull()
+                    || $property->hasDefaultValue()
+                    || $property->isPromoted()
+                    || $property->isReadOnly()
+                    || $property->hasHooks()
+                    || $property->isPrivateSet()
+                    || $property->isProtectedSet()
+                ) {
+                    throw new \LogicException(
+                        "{$where} is a #[Count]; declare it public int \${$name}; outside the constructor, without a default, hooks or readonly, so that reading it before withCount() fails.",
+                    );
+                }
+                $counts[$name] = $countAttributes[0]->newInstance()->relation;
+                continue;
+            }
             if (count($relationAttributes) > 1) {
                 throw new \LogicException(
                     "{$where} has two relation attributes; declare one relation on the property.",
@@ -344,6 +398,36 @@ final class ModelMap
                 $setters[$name] = $property;
             }
         }
+        foreach ($counts as $name => $relation) {
+            $counted = $relations[$relation] ?? null;
+            if ($counted === null || $counted->attribute instanceof MorphTo) {
+                throw new \LogicException(
+                    "{$class}::\${$name} counts \"{$relation}\", which is not "
+                    . (
+                        $counted === null
+                            ? 'one of its relations'
+                            : 'a relation that can be counted, as it belongs to one of several models'
+                    )
+                    . '; name one of: '
+                    . (
+                        implode(
+                            ', ',
+                            array_keys(array_filter(
+                                $relations,
+                                static fn(Relation $r): bool => !$r->attribute instanceof MorphTo,
+                            )),
+                        ) ?: '(none; declare a relation property)'
+                    )
+                    . '.',
+                );
+            }
+        }
+        $queryClass = $table->query ?? ModelQuery::class;
+        if ($queryClass !== ModelQuery::class && !is_subclass_of($queryClass, ModelQuery::class)) {
+            throw new \LogicException(
+                "{$class} names {$queryClass} as its query; name a class extending " . ModelQuery::class . '.',
+            );
+        }
         $key = $columns[$table->key] ?? null;
         if ($key !== null && (!in_array($key->type, [Field::INT, Field::STRING], true) || $key->nullable)) {
             throw new \LogicException(
@@ -365,6 +449,8 @@ final class ModelMap
             self::stamp($reflection, $columns, 'created'),
             self::stamp($reflection, $columns, 'updated'),
             $table->morph ?? $tableName,
+            $counts,
+            $queryClass,
         );
         foreach ($relations as $relation) {
             $relation->checkLocal($map);

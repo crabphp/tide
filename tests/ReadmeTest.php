@@ -38,7 +38,7 @@ final class ReadmeTest extends DatabaseTestCase
             preg_match('/\A\/\/ ([a-z-]+\.php)\n/', $block, $name);
             $blocks[$name[1]] = $block;
         }
-        self::assertCount(11, $blocks, 'Every PHP block needs a runnable example name.');
+        self::assertCount(14, $blocks, 'Every PHP block needs a runnable example name.');
         // Separate namespaces allow the exact declarations to run on every driver.
         $namespace = 'TideReadme' . bin2hex(random_bytes(6));
         $directory = sys_get_temp_dir() . '/tide-readme-' . bin2hex(random_bytes(6));
@@ -51,7 +51,7 @@ final class ReadmeTest extends DatabaseTestCase
             $source =
                 "<?php\ndeclare(strict_types=1);\nnamespace {$namespace};\n"
                 . implode("\n", $blocks)
-                . "\nreturn [\$books, \$page, \$recent, \$json, \$copy, \$count, \$names, \$titles, \$light, \$commented, \$owners, \$rows];\n";
+                . "\nreturn [\$books, \$page, \$recent, \$json, \$copy, \$count, \$names, \$titles, \$light, \$commented, \$owners, \$rows, \$counted, \$scoped, \$made, \$draft, \$posts, \$changed, \$found];\n";
             file_put_contents($directory . '/examples.php', $source);
             [
                 $books,
@@ -66,6 +66,13 @@ final class ReadmeTest extends DatabaseTestCase
                 $commented,
                 $owners,
                 $rows,
+                $counted,
+                $scoped,
+                $made,
+                $draft,
+                $posts,
+                $changed,
+                $found,
             ] = require $directory . '/examples.php';
             self::assertSame(1, $count);
             self::assertSame('{"id":1,"title":"PHP"}', json_encode($titles[0], JSON_THROW_ON_ERROR));
@@ -74,11 +81,19 @@ final class ReadmeTest extends DatabaseTestCase
             self::assertSame('First!', $commented[0]->comments[0]->body);
             self::assertSame('Hello', $owners[0]->commentable->title);
             self::assertSame('First', $rows[0]->author);
+            self::assertSame(1, $counted[0]->books_count);
+            self::assertSame(['PHP'], array_map(static fn(object $b): string => $b->title, $scoped));
+            self::assertCount(2, $made);
+            self::assertSame($made[0]->author_id, $made[1]->author_id);
+            self::assertFalse($draft->stored());
+            self::assertSame([1, 1], [$posts[0]->comments_count, $posts[0]->long_comments_count]);
+            self::assertTrue($changed);
+            self::assertSame(1, $found->id);
             self::assertCount(1, $books);
             self::assertCount(1, $page);
             self::assertCount(1, $recent);
             self::assertTrue($copy->stored());
-            self::assertSame(3, $database->table('books')->count());
+            self::assertSame(5, $database->table('books')->count());
             $decoded = json_decode($json, true, flags: JSON_THROW_ON_ERROR);
             self::assertSame('First', $decoded['author']['name']);
             self::assertArrayNotHasKey('internal_note', $decoded);

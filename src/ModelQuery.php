@@ -19,9 +19,21 @@ use Crab\Contracts\Database\Query;
  * query is made. Joins, expressions, totals and writes to many rows are the
  * query builder's.
  *
+ * A model's own conditions, scopes, are methods of a subclass it names in
+ * #[Table(query: PostQuery::class)]; every query of the model, relation
+ * queries and constraint closures included, is then one:
+ *
+ *     final class PostQuery extends ModelQuery
+ *     {
+ *         public function published(): static
+ *         {
+ *             return $this->whereNotNull('published_at');
+ *         }
+ *     }
+ *
  * @template T of Model
  */
-final class ModelQuery
+class ModelQuery
 {
     private Query $query;
     private ?Query $conditions = null;
@@ -36,15 +48,19 @@ final class ModelQuery
      */
     private ?array $selected = null;
     /**
+     * @var array<string, Query> The count subqueries withCount() asked for, by the #[Count] property each fills.
+     */
+    private array $counts = [];
+    /**
      * @var array<string, true> The model columns the query is ordered by, which a cursor is made of.
      */
     private array $orderColumns = [];
     public readonly string $qualifier;
 
     /**
-     * @internal Made by Model and the relation loader.
+     * @internal Made by Model and the relation loader, as Model::query() for an application.
      */
-    public function __construct(
+    final public function __construct(
         public readonly ModelMap $map,
         public readonly Database $database,
         ?Connection $connection = null,
@@ -140,14 +156,83 @@ final class ModelQuery
      */
     public function hydrate(array $row): Model
     {
-        if ($this->selected === null) {
-            return $this->map->hydrate($row);
+        $only = null;
+        if ($this->selected !== null) {
+            $only = [];
+            foreach ($this->selected as $column => $_) {
+                $only[$this->map->columns[$column]->property] = true;
+            }
         }
-        $only = [];
-        foreach ($this->selected as $column => $_) {
-            $only[$this->map->columns[$column]->property] = true;
+        $model = $this->map->hydrate($row, $only);
+        foreach ($this->counts as $property => $_) {
+            $model->{$property} = (int) $row[$property];
         }
-        return $this->map->hydrate($row, $only);
+        return $model;
+    }
+
+    /**
+     * Reads how many related rows each model has into its #[Count] properties,
+     * with one subquery per count in the same statement. A count is named by
+     * its relation, or by its property where a relation has several; a
+     * closure after it adds conditions:
+     *
+     *     Post::query()->withCount('comments')->get();                 // $post->comments_count
+     *     Post::query()->withCount('approved_comments_count', fn (ModelQuery $q) => $q->where('approved', true));
+     */
+    public function withCount(string|\Closure ...$counts): static
+    {
+        $previous = null;
+        foreach ([...$counts, null] as $count) {
+            if ($count instanceof \Closure && $previous === null) {
+                throw new \LogicException(
+                    "{$this->map->class} withCount() has a condition without a count; write withCount('comments', fn (ModelQuery \$query) => ...).",
+                );
+            }
+            if ($previous !== null) {
+                $property = $this->countProperty($previous);
+                $this->counts[$property] = Relations::exists(
+                    $this,
+                    $this->map->counts[$property],
+                    $count instanceof \Closure ? $count : null,
+                )
+                    ->select()
+                    ->selectRaw('count(*)');
+                $previous = null;
+                if ($count instanceof \Closure) {
+                    continue;
+                }
+            }
+            $previous = $count;
+        }
+        $this->applyColumns();
+        return $this;
+    }
+
+    /**
+     * The #[Count] property a name given to withCount() means: the property itself, or the one counting that relation.
+     */
+    private function countProperty(string $name): string
+    {
+        if (isset($this->map->counts[$name])) {
+            return $name;
+        }
+        $found = array_keys($this->map->counts, $name, true);
+        if (count($found) === 1) {
+            return $found[0];
+        }
+        throw new \LogicException(
+            $found === []
+                ? "{$this->map->class} has no #[Count] for \"{$name}\"; declare #[Count('{$name}')] public int \${$name}_count;"
+                . (
+                    $this->map->counts === []
+                        ? ''
+                        : ', or name one of: ' . implode(', ', array_keys($this->map->counts))
+                )
+                . '.'
+                : "{$this->map->class} has several counts of \"{$name}\"; name the property: "
+                . implode(' or ', $found)
+                . '.',
+        );
     }
 
     public function with(string|\Closure ...$relations): static
@@ -260,6 +345,68 @@ final class ModelQuery
     public function findOrFail(int|string $id): Model
     {
         return $this->find($id) ?? throw new ModelNotFound($this->map->class, $id);
+    }
+
+    /**
+     * The first matching model, or the new, unsaved one the closure makes.
+     *
+     *     $user = User::query()->where('email', $email)->firstOrNew(fn () => new User($email));
+     *
+     * @param \Closure(): T $make
+     * @return T
+     */
+    public function firstOrNew(\Closure $make): Model
+    {
+        return $this->first() ?? $this->made($make, 'firstOrNew');
+    }
+
+    /**
+     * The first matching model, or the one the closure makes, saved. The closure
+     * gives the new model what the conditions ask for. Two requests at once can
+     * both find none: a unique index on the columns is what makes one row of them.
+     *
+     * @param \Closure(): T $make
+     * @return T
+     */
+    public function firstOrCreate(\Closure $make): Model
+    {
+        return $this->first() ?? $this->made($make, 'firstOrCreate')->save();
+    }
+
+    /**
+     * The first matching model, or the one the first closure makes, changed by
+     * the second and saved: a row kept up to date by its natural key.
+     *
+     *     User::query()->where('github_id', $id)->updateOrCreate(
+     *         fn () => new User(github_id: $id),
+     *         fn (User $user) => $user->name = $name,
+     *     );
+     *
+     * @param \Closure(): T $make
+     * @param \Closure(T): mixed $change
+     * @return T
+     */
+    public function updateOrCreate(\Closure $make, \Closure $change): Model
+    {
+        $model = $this->first() ?? $this->made($make, 'updateOrCreate');
+        $change($model);
+        return $model->save();
+    }
+
+    /**
+     * @return T
+     */
+    private function made(\Closure $make, string $method): Model
+    {
+        $model = $make();
+        if (!$model instanceof Model || $model::class !== $this->map->class || $model->stored()) {
+            throw new \LogicException(
+                "{$this->map->class} {$method}() needs its closure to return a new {$this->map->class}; write fn () => new "
+                . substr($this->map->class, (int) strrpos('\\' . $this->map->class, '\\'))
+                . '(...).',
+            );
+        }
+        return $model;
     }
 
     /**
@@ -445,6 +592,31 @@ final class ModelQuery
         $this->ordering($column);
         $this->query->orderBy($this->named($column), $direction);
         return $this;
+    }
+
+    /**
+     * Newest first, by the model's created_at time, #[Timestamps]' own, or the column given.
+     */
+    public function latest(?string $column = null): static
+    {
+        return $this->orderBy($column ?? $this->createdColumn('latest'), 'desc');
+    }
+
+    /**
+     * Oldest first, by the model's created_at time or the column given.
+     */
+    public function oldest(?string $column = null): static
+    {
+        return $this->orderBy($column ?? $this->createdColumn('oldest'), 'asc');
+    }
+
+    private function createdColumn(string $method): string
+    {
+        return (
+            $this->map->createdAt->column ?? throw new \LogicException(
+                "{$this->map->class} {$method}() has no creation time to order by; name a column, {$method}('published_at'), or declare public ?\\DateTimeImmutable \$created_at;.",
+            )
+        );
     }
 
     public function limit(int $limit): static
@@ -752,11 +924,25 @@ final class ModelQuery
         if ($this->map->key !== null) {
             $this->selected[$this->map->key->column] = true;
         }
-        $columns = array_values(array_filter(
-            array_keys($this->map->columns),
-            fn(string $column): bool => isset($this->selected[$column]),
-        ));
+        $this->applyColumns();
+    }
+
+    /**
+     * The builder reads the model's columns, all or those chosen, in the model's order, then the counts asked for.
+     */
+    private function applyColumns(): void
+    {
+        $columns = array_keys($this->map->columns);
+        if ($this->selected !== null) {
+            $columns = array_values(array_filter(
+                $columns,
+                fn(string $column): bool => isset($this->selected[$column]),
+            ));
+        }
         $this->query->select(...array_map(fn(string $column): string => $this->qualifier . '.' . $column, $columns));
+        foreach ($this->counts as $property => $count) {
+            $this->query->selectSub($count, $property);
+        }
     }
 
     /**

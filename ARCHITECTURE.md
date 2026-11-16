@@ -1,6 +1,6 @@
 # Tide architecture
 
-Status: **released as 0.3.0, 2026-11-16.** The framework's own design is in [../framework/ARCHITECTURE.md](../framework/ARCHITECTURE.md), and this document follows its goals, layers and scopes.
+Status: **released as 0.3.1, 2026-11-17.** The framework's own design is in [../framework/ARCHITECTURE.md](../framework/ARCHITECTURE.md), and this document follows its goals, layers and scopes.
 
 ## What it is
 
@@ -54,7 +54,7 @@ Decision 6 of the framework stays as written: the framework has no model layer, 
 
 | Framework goal | What it means here |
 | --- | --- |
-| Lean | One base class, one query class, four relation attributes and JSON hiding. The names it assumes come from three small rules, not an inflector's dictionary. No collection class, no events. A model costs nothing an application does not use. |
+| Lean | One base class, one query class a model may extend with its own scopes, the relation attributes, counts and JSON hiding. The names it assumes come from three small rules, not an inflector's dictionary. No collection class, no events. A model costs nothing an application does not use. |
 | Long-running by design | A model holds no connection and no shared state. There is no identity map, no registry of models and nothing booted. What is cached is read from code alone, so one copy serves every worker and request. |
 | Async drivers | A query is a place where the worker may serve another request. So a query only ever runs at a call that looks like one: `get()`, `find()`, `save()`. Reading a property never runs a query. |
 | Measured | Reading rows into models is measured against arrays and against records, with the JIT off, and the numbers are kept in `BENCHMARKS.md`. |
@@ -117,7 +117,7 @@ A model is a concrete class that extends `Crab\Tide\Model`. Nothing else is requ
 | Case | Rule |
 | --- | --- |
 | What is a column | Every public, typed, non-static property that has no relation attribute, promoted or not |
-| What is not | A protected or private property, and a virtual property (a hook with no value of its own), which is how a computed value is written |
+| What is not | A protected or private property, a virtual property (a hook with no value of its own), which is how a computed value is written, and a `#[Count]` property, read by `withCount()` and never written |
 | A backed property with hooks | Persistence reads and writes raw values, including keys and snapshots, without running hooks. Application reads and writes run their hooks; JSON reads through getters |
 | Asymmetric setter visibility | Column properties with `public private(set)` or `public protected(set)` are assigned through cached reflection metadata |
 | The column's name | The property's name. `#[ColumnName]` gives another. Nothing is converted between snake and camel case |
