@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Crab\Tide\Tests;
 
+use Crab\Contracts\Http\HttpError;
 use Crab\Tide\ModelMap;
+use Crab\Tide\ModelNotFound;
 use Crab\Tide\ModelQuery;
 use Crab\Tide\Tests\Support\Book;
 use Crab\Tide\Tests\Support\DatabaseTestCase;
@@ -155,5 +157,47 @@ final class ModelQueryTest extends DatabaseTestCase
         }
         $cases['lockForUpdate'] = ['lockForUpdate', []];
         return $cases;
+    }
+
+    #[DataProvider('drivers')]
+    public function testFindOrFailAndFirstOrFailGiveTheModelOrA404(string $driver): void
+    {
+        $this->start($driver);
+        self::assertSame('Beta', Book::findOrFail(2)->title);
+        self::assertSame('Beta', Book::query()->where('votes', '>', 0)->findOrFail(2)->title);
+        self::assertSame('Alpha', Book::query()->orderBy('id')->firstOrFail()->title);
+
+        try {
+            Book::findOrFail(100);
+            self::fail('findOrFail() found a row that is not there.');
+        } catch (ModelNotFound $missing) {
+            self::assertInstanceOf(HttpError::class, $missing);
+            self::assertSame(404, $missing->status);
+            self::assertSame('No such book.', $missing->getMessage());
+            self::assertSame(Book::class, $missing->model);
+            self::assertSame(100, $missing->id);
+        }
+
+        // A key outside the query's conditions is not found, though the row exists.
+        $this->expectException(ModelNotFound::class);
+        Book::query()->where('id', '>', 2)->findOrFail(2);
+    }
+
+    #[DataProvider('drivers')]
+    public function testFirstOrFailOnNoMatchHasNoKey(string $driver): void
+    {
+        $this->start($driver);
+        try {
+            Book::query()->where('title', 'Nowhere')->firstOrFail();
+            self::fail('firstOrFail() found a row that is not there.');
+        } catch (ModelNotFound $missing) {
+            self::assertSame('No such book.', $missing->getMessage());
+            self::assertNull($missing->id);
+        }
+    }
+
+    public function testTheMessageNamesTheModelInWordsNotItsClass(): void
+    {
+        self::assertSame('No such order item.', new ModelNotFound('App\\Models\\OrderItem', 7)->getMessage());
     }
 }

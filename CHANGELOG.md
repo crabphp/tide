@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.3.0 — 2026-11-16
+
+- `findOrFail()` on a model and a model query, and `firstOrFail()` on a model query, return the model or throw `ModelNotFound`. It implements the framework's `HttpError`, so an action that lets it through answers 404 with "No such order.", naming the model in words and never its class or the key. The class and the key are on the exception. Write `find($id) ?? throw new HttpException(...)` where the status or message should differ.
+
 ## 0.2.0 — 2026-11-12
 
 Requires `crabphp/framework` ^0.7.2, for its loan guard and typed queries.

@@ -68,6 +68,7 @@ A property is an `int`, `float`, `string`, `bool`, a backed enum (stored as its 
 
 ```php
 $product  = Product::find(7);                                                        // ?Product
+$product  = Product::findOrFail(7);                                                  // Product, or a 404
 $products = Product::query()->where('category', 'kitchen')->orderBy('name')->get();   // list<Product>
 $page     = Product::query()->orderBy('id', 'desc')->paginate(20, $pageNumber);
 $taken    = Account::query()->where('email', $email)->exists();
@@ -75,6 +76,8 @@ $total    = Order::query()->where('user_id', $user->id)->sum('total');          
 $names    = Product::query()->orderBy('name')->pluck('name', 'id');                   // [id => name]
 $last     = Order::query()->max('created_at');                                        // ?DateTimeImmutable
 ```
+
+`findOrFail()` and `firstOrFail()` throw `ModelNotFound` when no row matches. It is an `HttpError`, so an action that lets it through answers 404 with "No such product.", which names the model in words and never its class or the key. Where a missing row means something else, a 401 at sign-in, a 422 for an id in a form, write the status yourself: `find($id) ?? throw new HttpException(422, 'Choose a product from the list.')`.
 
 The conditions are the query builder's, `where`, `whereIn`, `whereBetween`, `whereNull` and the rest, their values always bound. An enum or a date is given as it is: `where('status', OrderStatus::Paid)`.
 
@@ -224,7 +227,7 @@ A model call runs in the transaction it is written in, with nothing to pass:
 
 ```php
 $this->db->transaction(function (Connection $tx) use ($id): void {
-    $order = Order::query()->lockForUpdate()->find($id) ?? throw new HttpException(404, 'No such order.');
+    $order = Order::query()->lockForUpdate()->findOrFail($id);
     $order->status = OrderStatus::Shipped;
     ++$order->version;
     $order->save();                                        // in this transaction

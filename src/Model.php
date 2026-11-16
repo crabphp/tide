@@ -29,6 +29,14 @@ abstract class Model implements \JsonSerializable
     }
 
     /**
+     * @throws ModelNotFound answered with a 404 when no row has this key
+     */
+    public static function findOrFail(int|string $id): static
+    {
+        return static::query()->findOrFail($id);
+    }
+
+    /**
      * @param list<static> $models
      */
     public static function load(array $models, string|\Closure ...$relations): void

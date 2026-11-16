@@ -245,6 +245,24 @@ final class ModelQuery
     }
 
     /**
+     * @return T
+     * @throws ModelNotFound answered with a 404 when no row matches
+     */
+    public function firstOrFail(): Model
+    {
+        return $this->first() ?? throw new ModelNotFound($this->map->class);
+    }
+
+    /**
+     * @return T
+     * @throws ModelNotFound answered with a 404 when no row has this key among those the query matches
+     */
+    public function findOrFail(int|string $id): Model
+    {
+        return $this->find($id) ?? throw new ModelNotFound($this->map->class, $id);
+    }
+
+    /**
      * @return Page<T>
      */
     public function paginate(int $perPage = 15, int $page = 1): Page
