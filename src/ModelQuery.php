@@ -19,19 +19,21 @@ use Crab\Contracts\Database\Query;
  * query is made. Joins, expressions, totals and writes to many rows are the
  * query builder's.
  *
- * A condition a model's queries use again, a scope, is a static method of
- * the model that returns a closure for where(), which keeps it in brackets:
+ * A model's own conditions, scopes, are methods of a subclass named after
+ * it, PostQuery beside Post, or named in #[Table(query: ...)]; every query of
+ * the model, relation queries and constraint closures included, is then one:
  *
- *     public static function published(): \Closure
+ *     final class PostQuery extends ModelQuery
  *     {
- *         return fn (ModelQuery $query) => $query->whereNotNull('published_at');
+ *         public function published(): static
+ *         {
+ *             return $this->whereNotNull('published_at');
+ *         }
  *     }
- *
- *     Post::query()->where(Post::published())->where(Post::by($author))->get();
  *
  * @template T of Model
  */
-final class ModelQuery
+class ModelQuery
 {
     private Query $query;
     private ?Query $conditions = null;
@@ -58,7 +60,7 @@ final class ModelQuery
     /**
      * @internal Made by Model and the relation loader, as Model::query() for an application.
      */
-    public function __construct(
+    final public function __construct(
         public readonly ModelMap $map,
         public readonly Database $database,
         ?Connection $connection = null,

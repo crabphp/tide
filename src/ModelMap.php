@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Crab\Tide;
 
 use Crab\Contracts\Database\Cast;
+use Crab\Contracts\Database\Connection;
+use Crab\Contracts\Database\Database;
 use Crab\Contracts\Database\Field;
 use Crab\Database\ColumnName;
 
@@ -48,6 +50,7 @@ final class ModelMap
      * @param array<string, \ReflectionProperty> $setters
      * @param array<string, \ReflectionProperty> $readers
      * @param array<string, string> $counts The #[Count] properties, with the relation each counts.
+     * @param class-string<ModelQuery> $queryClass
      */
     private function __construct(
         public readonly string $class,
@@ -65,6 +68,7 @@ final class ModelMap
         public readonly ?Field $updatedAt = null,
         public readonly string $morph = '',
         public readonly array $counts = [],
+        public readonly string $queryClass = ModelQuery::class,
     ) {
         $this->reflection = new \ReflectionClass($class);
         $plain = true;
@@ -92,6 +96,16 @@ final class ModelMap
     public static function of(string $class): self
     {
         return self::$maps[$class] ??= self::inspect($class);
+    }
+
+    /**
+     * A query of this model, of the class #[Table(query: ...)] names.
+     *
+     * @return ModelQuery<Model>
+     */
+    public function query(Database $database, ?Connection $connection = null, ?string $alias = null): ModelQuery
+    {
+        return new $this->queryClass($this, $database, $connection, $alias);
     }
 
     public function requireKey(): Field
@@ -408,6 +422,15 @@ final class ModelMap
                 );
             }
         }
+        // Unsaid, a model's queries are of the class named after it beside it, BookQuery for Book, when that
+        // extends ModelQuery; a class of that name that does not, a search form's, is none of Tide's.
+        $named = $class . 'Query';
+        $queryClass = $table->query ?? (is_subclass_of($named, ModelQuery::class) ? $named : ModelQuery::class);
+        if ($queryClass !== ModelQuery::class && !is_subclass_of($queryClass, ModelQuery::class)) {
+            throw new \LogicException(
+                "{$class} names {$queryClass} as its query; name a class extending " . ModelQuery::class . '.',
+            );
+        }
         $key = $columns[$table->key] ?? null;
         if ($key !== null && (!in_array($key->type, [Field::INT, Field::STRING], true) || $key->nullable)) {
             throw new \LogicException(
@@ -430,6 +453,7 @@ final class ModelMap
             self::stamp($reflection, $columns, 'updated'),
             $table->morph ?? $tableName,
             $counts,
+            $queryClass,
         );
         foreach ($relations as $relation) {
             $relation->checkLocal($map);

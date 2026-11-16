@@ -54,7 +54,7 @@ Decision 6 of the framework stays as written: the framework has no model layer, 
 
 | Framework goal | What it means here |
 | --- | --- |
-| Lean | One base class, one query class, the relation attributes, counts and JSON hiding. A scope is a model method that returns a closure for `where()`. The names it assumes come from three small rules, not an inflector's dictionary. No collection class, no events. A model costs nothing an application does not use. |
+| Lean | One base class, one query class a model may extend with its own scopes, the relation attributes, counts and JSON hiding. The names it assumes come from a few small rules, not an inflector's dictionary. No collection class, no events. A model costs nothing an application does not use. |
 | Long-running by design | A model holds no connection and no shared state. There is no identity map, no registry of models and nothing booted. What is cached is read from code alone, so one copy serves every worker and request. |
 | Async drivers | A query is a place where the worker may serve another request. So a query only ever runs at a call that looks like one: `get()`, `find()`, `save()`. Reading a property never runs a query. |
 | Measured | Reading rows into models is measured against arrays and against records, with the JIT off, and the numbers are kept in `BENCHMARKS.md`. |
@@ -124,6 +124,7 @@ A model is a concrete class that extends `Crab\Tide\Model`. Nothing else is requ
 | Types | Those of a record: `int`, `float`, `string`, `bool`, a backed enum, `DateTimeImmutable`, an array with `#[Json]`, anything else with a `Cast` |
 | Refused | No type, a union type, `readonly`, `DateTime`, an array without `#[Json]`, two properties on one column. Said on first use, naming the property and what to write instead |
 | The table | The class in snake case and plural, by `s`, `es` or `ies`: `Book` reads `books`, `OrderItem` reads `order_items`, `Category` reads `categories`. `#[Table('people')]` names another |
+| The query class | `BookQuery` in `Book`'s namespace when it extends `ModelQuery`, so that scopes are real methods without magic dispatch. `#[Table(query: ...)]` names another |
 | The key | `id`, or `#[Table(key: 'uuid')]`. One column, an `int` or a `string`. A model with no such property can be read but not found, saved or deleted |
 | Another database | `#[Table('totals', database: 'reports')]`, a name from `database.connections` |
 | Parents | A model may extend an abstract model, whose properties are its own. Several classes in one table are not supported |
