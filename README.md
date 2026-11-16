@@ -55,7 +55,6 @@ final class Author extends Model
     public function __construct(public string $name) {}
 }
 
-#[Table(query: BookQuery::class)]
 final class Book extends Model
 {
     public int $id;
@@ -68,6 +67,16 @@ final class Book extends Model
     public ?Author $author;
 
     public function __construct(public string $title, public ?int $author_id) {}
+
+    public static function titled(string $word): \Closure
+    {
+        return fn (ModelQuery $query) => $query->where('title', 'like', "%{$word}%");
+    }
+
+    public static function by(Author $author): \Closure
+    {
+        return fn (ModelQuery $query) => $query->where('author_id', $author->id);
+    }
 }
 ```
 
@@ -86,7 +95,7 @@ The plural is made with `s`, `es` or `ies`. A word English makes plural another 
 
 Public, backed properties are columns; private, protected, static and virtual properties are not. Columns accept the framework's record types and casts, including backed enums, `DateTimeImmutable`, `#[Json]` arrays and custom `Cast` attributes. `#[ColumnName('created_at')]` maps another column name. Persistence reads and writes raw column values without running hooks, including stored keys and relation matching. Application reads and writes still run their hooks, and JSON uses the getter's view. Columns with `public private(set)` or `public protected(set)` are supported; readonly columns are refused. Relations must be plain public properties without hooks or asymmetric setter visibility.
 
-`#[Table('books', key: 'uuid', database: 'reports', query: BookQuery::class)]` names the table, another key column, a configured database and the model's own query class; each part is optional. Table, pivot and key names are identifiers, not SQL. A model without a key can be read, but cannot be found by key, saved, deleted, refreshed or queried through `related()`.
+`#[Table('books', key: 'uuid', database: 'reports')]` names the table, another key column and a configured database; each part is optional. Table, pivot and key names are identifiers, not SQL. A model without a key can be read, but cannot be found by key, saved, deleted, refreshed or queried through `related()`.
 
 ## Reading
 
@@ -121,26 +130,15 @@ The other columns are left uninitialised: reading one is PHP's error, never a de
 
 ### Scopes
 
-Conditions a model's queries use again are methods of its own query class, named in `#[Table(query: ...)]`. Every query of the model is one, `Book::query()`, `$author->related('books')` and the query a `with()` or `whereHas()` closure is given, so the methods chain anywhere, with real signatures:
+A condition a model's queries use again is a static method of the model that returns a closure, as `titled()` and `by()` on `Book` above. `where()` runs it in brackets, so an `or` inside it stays inside, and it chains anywhere a condition does: on `Book::query()`, on `$author->related('books')`, and given whole to `with()`, `whereHas()` and `withCount()`:
 
 ```php
 // scopes.php
-/** @extends ModelQuery<Book> */
-final class BookQuery extends ModelQuery
-{
-    public function titled(string $word): static
-    {
-        return $this->where('title', 'like', "%{$word}%");
-    }
-
-    public function by(Author $author): static
-    {
-        return $this->where('author_id', $author->id);
-    }
-}
-
-$scoped = Book::query()->by(Author::findOrFail(1))->titled('PHP')->latest()->get();
+$scoped = Book::query()->where(Book::by(Author::findOrFail(1)))->where(Book::titled('PHP'))->latest()->get();
+$theirs = Author::query()->with('books', Book::titled('PHP'))->get();
 ```
+
+A scope is a method with a real signature, found and checked as any other; there is no `->titled()` on the query, which only magic could give.
 
 ### What is the query builder's
 
@@ -264,7 +262,7 @@ $posts = Post::query()
     ->get();   // $posts[0]->comments_count, $posts[0]->long_comments_count
 ```
 
-Where a relation has one count, its name is enough, `withCount('books')`; with several, name the property. A count works with `select()`, on pages, and in a relation's constraint: `with('books', fn (BookQuery $query) => $query->withCount('comments'))`.
+Where a relation has one count, its name is enough, `withCount('books')`; with several, name the property. A count works with `select()`, on pages, and in a relation's constraint: `with('books', fn (ModelQuery $query) => $query->withCount('comments'))`.
 
 ### Writing links
 

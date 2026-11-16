@@ -20,7 +20,7 @@ abstract class Model implements \JsonSerializable
     public static function query(): ModelQuery
     {
         $map = ModelMap::of(static::class);
-        return $map->query(Tide::database($map->database));
+        return new ModelQuery($map, Tide::database($map->database));
     }
 
     public static function find(int|string $id): ?static
@@ -55,7 +55,7 @@ abstract class Model implements \JsonSerializable
                 . '::load() received a new model; save it before loading relations.');
             }
         }
-        $query = $map->query(Tide::database($map->database));
+        $query = new ModelQuery($map, Tide::database($map->database));
         Relations::load($query, $models, Relations::tree($map, $relations));
     }
 
@@ -540,7 +540,7 @@ abstract class Model implements \JsonSerializable
         if (!$this->stored()) {
             throw new \LogicException(static::class . '::related() needs a stored model; save it first.');
         }
-        return Relations::query($map->query(Tide::database($map->database)), $this, $map->relation($relation));
+        return Relations::query(new ModelQuery($map, Tide::database($map->database)), $this, $map->relation($relation));
     }
 
     public function jsonSerialize(): array

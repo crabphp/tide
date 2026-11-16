@@ -87,34 +87,39 @@ The conditions are the query builder's, `where`, `whereIn`, `whereBetween`, `whe
 
 A list is a PHP array of models. `paginate()`, `simplePaginate()` and `cursorPaginate()` give a `Page` whose `items` are models, and `chunkById()` walks a large table.
 
-Conditions used in several places are methods of the model's own query class, its scopes. The model names it, and every query of the model is one, a relation's and a `with()` closure's included, so they chain in any order:
+Conditions used in several places are the model's scopes: static methods that return a closure, given to `where()`. They run in brackets, so they combine in any order, and work on a relation's query and in a `with()` or `whereHas()` too.:
 
 ```php
-#[Table(query: ProductQuery::class)]
-final class Product extends Model { /* ... */ }
-
-/** @extends ModelQuery<Product> */
-final class ProductQuery extends ModelQuery
+final class Product extends Model
 {
-    public function inStock(): static
+    // ...
+
+    public static function inStock(): \Closure
     {
-        return $this->where('stock', '>', 0);
+        return fn (ModelQuery $query) => $query->where('stock', '>', 0);
     }
 
-    public function matching(ProductSearch $search): static
+    public static function matching(ProductSearch $search): \Closure
     {
-        if ($search->q !== '') {
-            $this->where('name', 'like', "%{$search->q}%");
-        }
-        if ($search->category !== null) {
-            $this->where('category', $search->category);
-        }
-        return $this;
+        return function (ModelQuery $query) use ($search): void {
+            if ($search->q !== '') {
+                $query->where('name', 'like', "%{$search->q}%");
+            }
+            if ($search->category !== null) {
+                $query->where('category', $search->category);
+            }
+        };
     }
 }
 
-$page = Product::query()->matching($search)->inStock()->orderBy('name')->paginate($search->perPage, $search->page);
+$page = Product::query()
+    ->where(Product::matching($search))
+    ->where(Product::inStock())
+    ->orderBy('name')
+    ->paginate($search->perPage, $search->page);
 ```
+
+A scope is a plain method: the editor finds it and PHP checks its arguments. There is no `->inStock()` on the query; only magic could give one.
 
 A list that shows how many related rows each model has reads them with `withCount()`, into a `#[Count]` property, in the same statement:
 
@@ -125,7 +130,7 @@ public int $products_count;                    // on Category, beside #[HasMany(
 $categories = Category::query()->withCount('products')->orderBy('name')->get();
 ```
 
-The property is uninitialised until a query asks for it, and never saved. A count with a condition has a property of its own: `withCount('products_count', 'in_stock_count', fn (ProductQuery $q) => $q->inStock())`.
+The property is uninitialised until a query asks for it, and never saved. A count with a condition has a property of its own: `withCount('products_count', 'in_stock_count', Product::inStock())`.
 
 A row found by a natural key, or made when there is none, is one call. The closure makes the new model with `new`, and runs only when no row matches:
 
@@ -343,7 +348,7 @@ For another shape, give the model a method; the sample's `Product::summary()` is
 ## What is not there
 
 - Loading a relation by reading it: `$order->lines` never runs a query.
-- Events, observers and global scopes: what happens is written where it happens, with `isDirty()` where it depends on a change. A scope is a method you call.
+- Events, observers and global scopes: what happens is written where it happens, with `isDirty()` where it depends on a change. A scope is a method of the model that returns a condition.
 - Soft deletes: a column of your own, and a condition on it.
 - A collection class: a list is a PHP array.
 - Relations through another model, and keys of several columns.

@@ -37,7 +37,7 @@ final class Author extends Model
     public int $popular_books_count;
 }
 
-#[Table('tide_books', query: BookQuery::class)]
+#[Table('tide_books')]
 final class Book extends Model
 {
     public int $id;
@@ -68,6 +68,16 @@ final class Book extends Model
     {
         $this->title = $title;
         $this->author_id = $authorId;
+    }
+
+    public static function popular(int $votes = 3): \Closure
+    {
+        return static fn(ModelQuery $query): ModelQuery => $query->where('votes', '>=', $votes);
+    }
+
+    public static function by(Author $author): \Closure
+    {
+        return static fn(ModelQuery $query): ModelQuery => $query->where('author_id', $author->id);
     }
 }
 
@@ -149,22 +159,6 @@ final class Price extends Model
     public int $id;
     #[AsMoney]
     public Money $amount;
-}
-
-/**
- * @extends ModelQuery<Book>
- */
-final class BookQuery extends ModelQuery
-{
-    public function popular(int $votes = 3): static
-    {
-        return $this->where('votes', '>=', $votes);
-    }
-
-    public function by(Author $author): static
-    {
-        return $this->where('author_id', $author->id);
-    }
 }
 
 /**

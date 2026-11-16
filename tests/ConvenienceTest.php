@@ -12,7 +12,6 @@ use Crab\Tide\Table;
 use Crab\Tide\Tests\Support\Author;
 use Crab\Tide\Tests\Support\Book;
 use Crab\Tide\Tests\Support\BookFactory;
-use Crab\Tide\Tests\Support\BookQuery;
 use Crab\Tide\Tests\Support\Category;
 use Crab\Tide\Tests\Support\DatabaseTestCase;
 use Crab\Tide\Tests\Support\Money;
@@ -90,7 +89,7 @@ final class ConvenienceTest extends DatabaseTestCase
     {
         $this->start($driver);
         $ada = Author::query()
-            ->with('books', static fn(BookQuery $q) => $q->withCount('chapters'))
+            ->with('books', static fn(ModelQuery $q) => $q->withCount('chapters'))
             ->find(1);
         self::assertSame([2, 1], array_map(static fn(Book $b): int => $b->chapters_count, $ada->books));
     }
@@ -283,34 +282,31 @@ final class ConvenienceTest extends DatabaseTestCase
         }
     }
 
-    // Query scopes
+    // Scopes
 
     #[DataProvider('drivers')]
-    public function testAModelsOwnQueryClassChainsAnywhereAndInRelations(string $driver): void
+    public function testAScopeIsAModelMethodGivingAClosureThatChainsAnywhere(string $driver): void
     {
         $this->start($driver);
         $ada = Author::find(1);
-        self::assertInstanceOf(BookQuery::class, Book::query());
-        self::assertSame(['Beta'], Book::query()->by($ada)->popular(2)->pluck('title'));
-        self::assertSame(['Gamma', 'Delta'], Book::query()->orderBy('id')->popular()->pluck('title'));
-        self::assertInstanceOf(BookQuery::class, $ada->related('books'));
-        self::assertSame(['Beta'], $ada->related('books')->popular(2)->pluck('title'));
-        $loaded = Author::query()
-            ->with('books', static fn(BookQuery $q) => $q->popular(2))
-            ->find(1);
-        self::assertSame(['Beta'], array_map(static fn(Book $b): string => $b->title, $loaded->books));
+        self::assertSame(['Beta'], Book::query()->where(Book::by($ada))->where(Book::popular(2))->pluck('title'));
+        self::assertSame(['Gamma', 'Delta'], Book::query()->orderBy('id')->where(Book::popular())->pluck('title'));
         self::assertSame(
-            [2],
-            Author::query()
-                ->whereHas('books', static fn(BookQuery $q) => $q->popular(3))
-                ->pluck('id'),
+            ['Alpha', 'Beta', 'Delta'],
+            Book::query()->where(Book::by($ada))->orWhere(Book::popular(4))->orderBy('id')->pluck('title'),
         );
-    }
-
-    public function testTheQueryClassMustExtendModelQuery(): void
-    {
-        $this->expectExceptionMessage('names stdClass as its query; name a class extending ' . ModelQuery::class);
-        ModelMap::of(WrongQuery::class);
+        self::assertSame(['Beta'], $ada->related('books')->where(Book::popular(2))->pluck('title'));
+        self::assertSame(['Beta'], $ada->related('books')->orWhere(Book::popular(2))->pluck('title'));
+        $loaded = Author::query()->with('books', Book::popular(2))->find(1);
+        self::assertSame(['Beta'], array_map(static fn(Book $b): string => $b->title, $loaded->books));
+        self::assertSame([2], Author::query()->whereHas('books', Book::popular(3))->pluck('id'));
+        self::assertSame(
+            1,
+            Author::query()
+                ->withCount('books_count', 'popular_books_count', Book::popular(2))
+                ->find(1)
+                ->popular_books_count,
+        );
     }
 
     // latest(), oldest()
@@ -377,12 +373,6 @@ final class Dated extends Model
 {
     public int $id;
     public ?\DateTimeImmutable $created_at = null;
-}
-
-#[Table('tide_books', query: \stdClass::class)]
-final class WrongQuery extends Model
-{
-    public int $id;
 }
 
 #[Table('tide_authors')]

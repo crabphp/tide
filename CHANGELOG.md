@@ -8,7 +8,7 @@
 - `save(['title' => 'Beta', 'author_id' => 2])` assigns the values and saves, as one change. Each key must be one of the model's columns, and a value of the wrong type is a `TypeError` with nothing assigned.
 - `isDirty()`, `isDirty('status')`, `dirty()` and `original('status')` say what `save()` would write and what a column held when read or last saved, by the same comparison `save()` makes.
 - `firstOrNew()`, `firstOrCreate()` and `updateOrCreate()` on a model query: the first matching model, or the new one a closure makes with `new`, unsaved, saved, or changed by a second closure and saved.
-- Scopes: `#[Table(query: PostQuery::class)]` names a `ModelQuery` subclass whose methods are the model's own conditions. Every query of the model is one, `related()` and the queries `with()`, `whereHas()` and `withCount()` closures are given included, so `Post::query()->published()->by($author)` chains in any order. `ModelQuery` is no longer final; its constructor is.
+- Scopes are written in the model: a static method that returns a closure, given to `where()`, `with()`, `whereHas()` or `withCount()`: `Post::query()->where(Post::published())->where(Post::by($author))`. `where()` runs it in brackets, so an `or` inside one stays inside. The README and guide show the pattern; no API was needed for it.
 - `latest()` and `oldest()` are back, ordering by the model's creation time, or the column given, and refusing a model that keeps none.
 - `Factory` makes models for tests and seeders: `BookFactory::new()->count(3)->for('author', $ada)->state(['votes' => 10])->create()`, with a sequence number for unique values. A factory is never changed; each method returns a new one.
 
