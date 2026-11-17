@@ -117,25 +117,28 @@ $page = Product::query()->matching($search)->inStock()->orderBy('name')->paginat
 A list that shows how many related rows each model has reads them with `withCount()`, into a `#[Count]` property, in the same statement:
 
 ```php
-#[Count('products')]
-public int $products_count;                    // on Category, beside #[HasMany(Product::class)] public array $products;
+#[Count('lines')]
+public int $lines_count;                       // on Order, beside #[HasMany(OrderItem::class)] public array $lines;
 
-$categories = Category::query()->withCount('products')->orderBy('name')->get();
+$orders = Order::query()->where('user_id', $account->id)->withCount('lines')->latest()->paginate(20);
 ```
 
-The property is uninitialised until a query asks for it, and never saved. A count with a condition has a property of its own: `withCount('products_count', 'in_stock_count', fn (ProductQuery $q) => $q->inStock())`.
+The property is uninitialised until a query asks for it, and never saved. A count with a condition has a property of its own, named to `withCount()` with the condition after it: `withCount('lines_count', 'bulk_lines_count', fn (ModelQuery $q) => $q->where('quantity', '>=', 10))`.
 
-A row found by a natural key, or made when there is none, is one call. The closure makes the new model with `new`, and runs only when no row matches:
+A row found by its key, or made when there is none, is one call. The closure makes the new model with `new`, and runs only when no row matches:
 
 ```php
-$customer = Customer::query()->where('email', $email)->firstOrCreate(fn () => new Customer($email));
-$setting  = Setting::query()->where('name', 'currency')->updateOrCreate(
-    fn () => new Setting('currency'),
-    fn (Setting $setting) => $setting->value = 'EUR',
+$preferences = Preferences::query()->where('user_id', $account->id)->updateOrCreate(
+    function () use ($account): Preferences {
+        $preferences = new Preferences();
+        $preferences->accountId = $account->id;
+        return $preferences;
+    },
+    fn (Preferences $preferences) => $preferences->newsletter = $form->newsletter,
 );
 ```
 
-`firstOrNew()` returns the new model unsaved. Two requests at once can both find no row; a unique index on the column keeps them to one.
+`firstOrNew()` returns the found or new model unsaved, and `firstOrCreate()` saves a new one. Two requests at once can both find no row; a unique index on the column keeps them to one.
 
 A list that needs only some of a model's columns says so, and gets models with the rest uninitialised:
 
@@ -310,7 +313,7 @@ final class ProductFactory extends Factory
 }
 
 $products = ProductFactory::new()->count(3)->state(['stock' => 0])->create();   // list<Product>, saved
-$line     = OrderLineFactory::new()->for('order', $order)->createOne();          // by its BelongsTo
+$line     = OrderItemFactory::new()->for('product', $product)->createOne();      // by its BelongsTo
 $draft    = ProductFactory::new()->state(fn (Product $p) => $p->price = 0)->makeOne();   // not saved
 ```
 
