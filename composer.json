@@ -25,7 +25,8 @@
         "test": "@php vendor/bin/phpunit",
         "format": "@php vendor/bin/mago fmt",
         "format:check": "@php vendor/bin/mago fmt --check",
-        "lint": "@php vendor/bin/mago lint"
+        "lint": "@php vendor/bin/mago lint",
+        "analyze": "@php vendor/bin/mago analyze --baseline mago-baseline.toml"
     },
     "repositories": [
         {

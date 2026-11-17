@@ -6,7 +6,7 @@ php-version = "8.4.0"
 workspace = "."
 paths = ["src/", "tests/"]
 includes = ["vendor"]
-excludes = ["vendor/**", "storage/**", "benchmarks/results/**"]
+excludes = ["storage/**", "benchmarks/results/**"]
 
 [source.glob]
 literal-separator = true

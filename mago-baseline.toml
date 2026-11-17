@@ -1,0 +1,1921 @@
+variant = "loose"
+
+[[issues]]
+file = "src/Factory.php"
+code = "mixed-assignment"
+message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
+count = 1
+
+[[issues]]
+file = "src/Factory.php"
+code = "string-member-selector"
+message = "This member selector uses a non-literal string type (`string`); its specific value cannot be statically determined."
+count = 1
+
+[[issues]]
+file = "src/Model.php"
+code = "avoid-catching-error"
+message = "Avoid catching 'Error' class instances."
+count = 1
+
+[[issues]]
+file = "src/Model.php"
+code = "less-specific-return-statement"
+message = 'Returned type `Crab\Tide\ModelQuery<Crab\Tide\Model>` is less specific than the declared return type `Crab\Tide\ModelQuery<crab\tide\model&static>` for function `Crab\Tide\Model::query`.'
+count = 1
+
+[[issues]]
+file = "src/Model.php"
+code = "mixed-argument"
+message = 'Invalid argument type for argument #1 of `Crab\Tide\ModelQuery::find`: expected `int|string`, but found `mixed`.'
+count = 1
+
+[[issues]]
+file = "src/Model.php"
+code = "mixed-assignment"
+message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
+count = 8
+
+[[issues]]
+file = "src/Model.php"
+code = "mixed-operand"
+message = "Left operand in spaceship comparison (`<=>`) has `mixed` type."
+count = 1
+
+[[issues]]
+file = "src/Model.php"
+code = "mixed-operand"
+message = "Right operand in spaceship comparison (`<=>`) has `mixed` type."
+count = 1
+
+[[issues]]
+file = "src/Model.php"
+code = "possibly-invalid-argument"
+message = "Possible argument type mismatch for argument #1 of `array_flip`: expected `array<non-negative-int, ('V.array_flip() extends array-key)>`, but possibly received `list{0?: null|string, 1: null|string}`."
+count = 1
+
+[[issues]]
+file = "src/Model.php"
+code = "possibly-invalid-argument"
+message = 'Possible argument type mismatch for argument #2 of `Crab\Tide\Relations::tree`: expected `list<(closure(...mixed): mixed)|string>`, but possibly received `array<array-key, (closure(...mixed=): mixed)|string>`.'
+count = 1
+
+[[issues]]
+file = "src/Model.php"
+code = "possibly-null-argument"
+message = "Argument #1 of function `array_replace` is possibly `null`, but parameter type `array<string, mixed>` does not accept it."
+count = 1
+
+[[issues]]
+file = "src/Model.php"
+code = "possibly-null-array-access"
+message = "Cannot perform array access on possibly `null` value."
+count = 3
+
+[[issues]]
+file = "src/Model.php"
+code = "possibly-null-array-index"
+message = "Possibly using `null` as an array index to access elementof variable $map->columns."
+count = 3
+
+[[issues]]
+file = "src/Model.php"
+code = "redundant-cast"
+message = "Redundant cast to `(string)`: the expression already has this type."
+count = 1
+
+[[issues]]
+file = "src/Model.php"
+code = "redundant-logical-operation"
+message = "Redundant `||` operation: left operand is always false and right operand is evaluated."
+count = 1
+
+[[issues]]
+file = "src/Model.php"
+code = "string-member-selector"
+message = "This member selector uses a non-literal string type (`string`); its specific value cannot be statically determined."
+count = 5
+
+[[issues]]
+file = "src/Model.php"
+code = "template-constraint-violation"
+message = "Argument type mismatch for template `V`."
+count = 1
+
+[[issues]]
+file = "src/ModelMap.php"
+code = "avoid-catching-error"
+message = "Avoid catching 'Error' class instances."
+count = 1
+
+[[issues]]
+file = "src/ModelMap.php"
+code = "invalid-method-access"
+message = "Attempting to access a method on a non-object type (`false`)."
+count = 1
+
+[[issues]]
+file = "src/ModelMap.php"
+code = "less-specific-argument"
+message = 'Argument type mismatch for argument #1 of `Crab\Tide\ModelMap::assign`: expected `Crab\Tide\Model`, but provided type `object` is less specific.'
+count = 1
+
+[[issues]]
+file = "src/ModelMap.php"
+code = "less-specific-argument"
+message = 'Argument type mismatch for argument #1 of `Crab\Tide\ModelMap::forget`: expected `Crab\Tide\Model`, but provided type `object` is less specific.'
+count = 1
+
+[[issues]]
+file = "src/ModelMap.php"
+code = "less-specific-argument"
+message = 'Argument type mismatch for argument #1 of `Crab\Tide\ModelMap::initialized`: expected `Crab\Tide\Model`, but provided type `object` is less specific.'
+count = 1
+
+[[issues]]
+file = "src/ModelMap.php"
+code = "less-specific-argument"
+message = 'Argument type mismatch for argument #2 of `Crab\Tide\Relation::of`: expected `Crab\Tide\BelongsTo|Crab\Tide\BelongsToMany|Crab\Tide\HasMany|Crab\Tide\HasOne|Crab\Tide\MorphMany|Crab\Tide\MorphOne|Crab\Tide\MorphTo|Crab\Tide\MorphToMany|Crab\Tide\MorphedByMany`, but provided type `object` is less specific.'
+count = 1
+
+[[issues]]
+file = "src/ModelMap.php"
+code = "less-specific-return-statement"
+message = 'Returned type `array<array-key, mixed>` is less specific than the declared return type `array<string, mixed>` for function `Crab\Tide\ModelMap::values`.'
+count = 1
+
+[[issues]]
+file = "src/ModelMap.php"
+code = "less-specific-return-statement"
+message = 'Returned type `object` is less specific than the declared return type `Crab\Tide\Model` for function `Crab\Tide\ModelMap::hydrate`.'
+count = 1
+
+[[issues]]
+file = "src/ModelMap.php"
+code = "mixed-assignment"
+message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
+count = 2
+
+[[issues]]
+file = "src/ModelMap.php"
+code = "property-type-coercion"
+message = "A value of a less specific type `array<array-key, mixed>` is being assigned to property `$storedValues` (array<string, mixed>|null)."
+count = 1
+
+[[issues]]
+file = "src/ModelMap.php"
+code = "redundant-cast"
+message = "Redundant cast to `(string)`: the expression already has this type."
+count = 1
+
+[[issues]]
+file = "src/ModelMap.php"
+code = "string-member-selector"
+message = "This member selector uses a non-literal string type (`string`); its specific value cannot be statically determined."
+count = 4
+
+[[issues]]
+file = "src/ModelQuery.php"
+code = "invalid-return-statement"
+message = '''Invalid return type for function `Crab\Tide\ModelQuery::firstOrCreate`: expected `('T.crab\tide\modelquery extends Crab\Tide\Model)`, but found `('T.crab\tide\modelquery extends Crab\Tide\Model)|Crab\Tide\Model&static`.'''
+count = 1
+
+[[issues]]
+file = "src/ModelQuery.php"
+code = "invalid-return-statement"
+message = '''Invalid return type for function `Crab\Tide\ModelQuery::made`: expected `('T.crab\tide\modelquery extends Crab\Tide\Model)`, but found `Crab\Tide\Model`.'''
+count = 1
+
+[[issues]]
+file = "src/ModelQuery.php"
+code = "invalid-return-statement"
+message = '''Invalid return type for function `Crab\Tide\ModelQuery::models`: expected `list<('T.crab\tide\modelquery extends Crab\Tide\Model)>`, but found `list<Crab\Tide\Model>`.'''
+count = 1
+
+[[issues]]
+file = "src/ModelQuery.php"
+code = "invalid-return-statement"
+message = '''Invalid return type for function `Crab\Tide\ModelQuery::updateOrCreate`: expected `('T.crab\tide\modelquery extends Crab\Tide\Model)`, but found `Crab\Tide\Model&static`.'''
+count = 1
+
+[[issues]]
+file = "src/ModelQuery.php"
+code = "less-specific-argument"
+message = 'Argument type mismatch for argument #1 of `Crab\Tide\ModelMap::relation`: expected `string`, but provided type `array-key` is less specific.'
+count = 1
+
+[[issues]]
+file = "src/ModelQuery.php"
+code = "less-specific-argument"
+message = '''Argument type mismatch for argument #3 of `Crab\Tide\Relations::load`: expected `array<string, array{'constraints': list<(closure(...mixed): mixed)>, 'nested': array<array-key, mixed>}>`, but provided type `array<array-key, mixed>` is less specific.'''
+count = 1
+
+[[issues]]
+file = "src/ModelQuery.php"
+code = "less-specific-argument"
+message = '''Argument type mismatch for argument #3 of `Crab\Tide\Relations::tree`: expected `array<string, array{'constraints': list<(closure(...mixed): mixed)>, 'nested': array<array-key, mixed>}>`, but provided type `array<array-key, mixed>` is less specific.'''
+count = 1
+
+[[issues]]
+file = "src/ModelQuery.php"
+code = "less-specific-nested-argument-type"
+message = 'Argument type mismatch for argument #1 of `Crab\Tide\ModelQuery::models`: expected `list<array<string, mixed>>`, but provided type `list<mixed>` is less specific.'
+count = 5
+
+[[issues]]
+file = "src/ModelQuery.php"
+code = "less-specific-nested-argument-type"
+message = 'Argument type mismatch for argument #1 of `Crab\Tide\ModelQuery::models`: expected `list<array<string, mixed>>`, but provided type `list{nonnull}` is less specific.'
+count = 2
+
+[[issues]]
+file = "src/ModelQuery.php"
+code = "mismatched-array-index"
+message = "Invalid array key type: `false|string` is not a valid key for this array."
+count = 1
+
+[[issues]]
+file = "src/ModelQuery.php"
+code = "mixed-assignment"
+message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
+count = 5
+
+[[issues]]
+file = "src/ModelQuery.php"
+code = "mixed-return-statement"
+message = "Could not infer a precise return type for function `{closure:src/ModelQuery.php:882:32}`. Saw type `mixed`."
+count = 1
+
+[[issues]]
+file = "src/ModelQuery.php"
+code = "possibly-invalid-argument"
+message = 'Possible argument type mismatch for argument #2 of `Crab\Tide\Relations::tree`: expected `list<(closure(...mixed): mixed)|string>`, but possibly received `array<array-key, (closure(...mixed=): mixed)|string>`.'
+count = 1
+
+[[issues]]
+file = "src/ModelQuery.php"
+code = "string-member-selector"
+message = "This member selector uses a non-literal string type (`string`); its specific value cannot be statically determined."
+count = 4
+
+[[issues]]
+file = "src/Pivots.php"
+code = "invalid-array-element-key"
+message = "Invalid array key type."
+count = 2
+
+[[issues]]
+file = "src/Pivots.php"
+code = "less-specific-argument"
+message = 'Argument type mismatch for argument #1 of `Crab\Contracts\Database\Query::insertMany`: expected `list<array<string, mixed>|object>`, but provided type `non-empty-list<non-empty-array<array-key, mixed>>` is less specific.'
+count = 1
+
+[[issues]]
+file = "src/Pivots.php"
+code = "less-specific-nested-argument-type"
+message = 'Argument type mismatch for argument #1 of `Crab\Contracts\Database\Query::where`: expected `(closure(Crab\Contracts\Database\Query<mixed>): mixed)|array<string, mixed>|string`, but provided type `non-empty-array<array-key, mixed>` is less specific.'
+count = 1
+
+[[issues]]
+file = "src/Pivots.php"
+code = "less-specific-nested-return-statement"
+message = '''Returned type `array<string, mixed>` is less specific than the declared return type `array<string, int|string>` for function `Crab\Tide\Pivots::keys` due to nested 'mixed'.'''
+count = 1
+
+[[issues]]
+file = "src/Pivots.php"
+code = "mixed-assignment"
+message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
+count = 3
+
+[[issues]]
+file = "src/Pivots.php"
+code = "possibly-null-argument"
+message = 'Argument #1 of method `Crab\Contracts\Database\Connection::table` is possibly `null`, but parameter type `Crab\Contracts\Database\Query<mixed>|string` does not accept it.'
+count = 2
+
+[[issues]]
+file = "src/Pivots.php"
+code = "possibly-null-argument"
+message = 'Argument #1 of method `Crab\Contracts\Database\Query::pluck` is possibly `null`, but parameter type `string` does not accept it.'
+count = 1
+
+[[issues]]
+file = "src/Pivots.php"
+code = "possibly-null-argument"
+message = 'Argument #1 of method `Crab\Contracts\Database\Query::whereIn` is possibly `null`, but parameter type `string` does not accept it.'
+count = 1
+
+[[issues]]
+file = "src/Pivots.php"
+code = "string-member-selector"
+message = "This member selector uses a non-literal string type (`string`); its specific value cannot be statically determined."
+count = 1
+
+[[issues]]
+file = "src/Relation.php"
+code = "invalid-method-access"
+message = "Attempting to access a method on a non-object type (`false`)."
+count = 1
+
+[[issues]]
+file = "src/Relation.php"
+code = "invalid-return-statement"
+message = 'Invalid return type for function `Crab\Tide\Relation::localColumns`: expected `list<string>`, but found `list{null|string, null|string}`.'
+count = 1
+
+[[issues]]
+file = "src/Relation.php"
+code = "invalid-return-statement"
+message = 'Invalid return type for function `Crab\Tide\Relation::morphType`: expected `array{0: string, 1: string}|null`, but found `list{null|string, string}`.'
+count = 1
+
+[[issues]]
+file = "src/Relation.php"
+code = "possibly-null-argument"
+message = 'Argument #2 of method `Crab\Tide\Relation::field` is possibly `null`, but parameter type `string` does not accept it.'
+count = 5
+
+[[issues]]
+file = "src/Relation.php"
+code = "possibly-null-array-index"
+message = "Possibly using `null` as an array index to access elementof variable $map->columns."
+count = 1
+
+[[issues]]
+file = "src/Relation.php"
+code = "possibly-null-operand"
+message = "Possibly null left operand used in string concatenation (type `null|string`)."
+count = 1
+
+[[issues]]
+file = "src/Relations.php"
+code = "less-specific-argument"
+message = 'Argument type mismatch for argument #1 of `Crab\Tide\ModelMap::relation`: expected `string`, but provided type `array-key` is less specific.'
+count = 3
+
+[[issues]]
+file = "src/Relations.php"
+code = "less-specific-argument"
+message = '''Argument type mismatch for argument #3 of `Crab\Tide\Relations::load`: expected `array<string, array{'constraints': list<(closure(...mixed): mixed)>, 'nested': array<array-key, mixed>}>`, but provided type `array<array-key, mixed>` is less specific.'''
+count = 2
+
+[[issues]]
+file = "src/Relations.php"
+code = "mixed-argument"
+message = 'Invalid argument type for argument #1 of `Crab\Tide\ModelQuery::hydrate`: expected `array<string, mixed>`, but found `mixed`.'
+count = 3
+
+[[issues]]
+file = "src/Relations.php"
+code = "mixed-argument"
+message = 'Invalid argument type for argument #2 of `Crab\Tide\Relations::validate`: expected `array<array-key, mixed>`, but found `mixed`.'
+count = 1
+
+[[issues]]
+file = "src/Relations.php"
+code = "mixed-array-access"
+message = "Unsafe array access on type `mixed`."
+count = 7
+
+[[issues]]
+file = "src/Relations.php"
+code = "mixed-array-access"
+message = "Unsafe array access on type `nonnull`."
+count = 1
+
+[[issues]]
+file = "src/Relations.php"
+code = "mixed-array-assignment"
+message = "Unsafe array assignment on type `mixed`."
+count = 3
+
+[[issues]]
+file = "src/Relations.php"
+code = "mixed-assignment"
+message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
+count = 9
+
+[[issues]]
+file = "src/Relations.php"
+code = "mixed-return-statement"
+message = 'Could not infer a precise return type for function `Crab\Tide\Relations::value`. Saw type `mixed`.'
+count = 1
+
+[[issues]]
+file = "src/Relations.php"
+code = "non-existent-property"
+message = 'Property `$pivot` does not exist on class `Crab\Tide\BelongsTo`.'
+count = 1
+
+[[issues]]
+file = "src/Relations.php"
+code = "non-existent-property"
+message = 'Property `$pivot` does not exist on class `Crab\Tide\HasMany`.'
+count = 1
+
+[[issues]]
+file = "src/Relations.php"
+code = "non-existent-property"
+message = 'Property `$pivot` does not exist on class `Crab\Tide\HasOne`.'
+count = 1
+
+[[issues]]
+file = "src/Relations.php"
+code = "non-existent-property"
+message = 'Property `$pivot` does not exist on class `Crab\Tide\MorphMany`.'
+count = 1
+
+[[issues]]
+file = "src/Relations.php"
+code = "non-existent-property"
+message = 'Property `$pivot` does not exist on class `Crab\Tide\MorphOne`.'
+count = 1
+
+[[issues]]
+file = "src/Relations.php"
+code = "non-existent-property"
+message = 'Property `$pivot` does not exist on class `Crab\Tide\MorphTo`.'
+count = 1
+
+[[issues]]
+file = "src/Relations.php"
+code = "non-existent-property"
+message = 'Property `$relatedKey` does not exist on class `Crab\Tide\BelongsTo`.'
+count = 1
+
+[[issues]]
+file = "src/Relations.php"
+code = "non-existent-property"
+message = 'Property `$relatedKey` does not exist on class `Crab\Tide\HasMany`.'
+count = 1
+
+[[issues]]
+file = "src/Relations.php"
+code = "non-existent-property"
+message = 'Property `$relatedKey` does not exist on class `Crab\Tide\HasOne`.'
+count = 1
+
+[[issues]]
+file = "src/Relations.php"
+code = "non-existent-property"
+message = 'Property `$relatedKey` does not exist on class `Crab\Tide\MorphMany`.'
+count = 1
+
+[[issues]]
+file = "src/Relations.php"
+code = "non-existent-property"
+message = 'Property `$relatedKey` does not exist on class `Crab\Tide\MorphOne`.'
+count = 1
+
+[[issues]]
+file = "src/Relations.php"
+code = "non-existent-property"
+message = 'Property `$relatedKey` does not exist on class `Crab\Tide\MorphTo`.'
+count = 1
+
+[[issues]]
+file = "src/Relations.php"
+code = "possibly-invalid-argument"
+message = "Possible argument type mismatch for argument #1 of `array_values`: expected `array<('K.array_values() extends array-key), int|null|string>`, but possibly received `non-empty-array<int|null|string, int|null|string>`."
+count = 1
+
+[[issues]]
+file = "src/Relations.php"
+code = "possibly-null-argument"
+message = 'Argument #1 of method `Crab\Contracts\Database\Query::join` is possibly `null`, but parameter type `string` does not accept it.'
+count = 1
+
+[[issues]]
+file = "src/Relations.php"
+code = "possibly-null-argument"
+message = 'Argument #1 of method `Crab\Tide\ModelMap::relation` is possibly `null`, but parameter type `string` does not accept it.'
+count = 1
+
+[[issues]]
+file = "src/Relations.php"
+code = "possibly-null-array-index"
+message = "Possibly using `null` as an array index to access elementof variable $map->columns."
+count = 2
+
+[[issues]]
+file = "src/Relations.php"
+code = "possibly-null-array-index"
+message = "Possibly using `null` as an array index to access elementof variable $wanted[-unknown-]."
+count = 1
+
+[[issues]]
+file = "src/Relations.php"
+code = "possibly-null-operand"
+message = "Possibly null left operand used in string concatenation (type `null|string`)."
+count = 5
+
+[[issues]]
+file = "src/Relations.php"
+code = "possibly-null-operand"
+message = "Possibly null middle operand used in string concatenation (type `null|string`)."
+count = 1
+
+[[issues]]
+file = "src/Relations.php"
+code = "possibly-null-operand"
+message = "Possibly null right operand used in string concatenation (type `null|string`)."
+count = 4
+
+[[issues]]
+file = "src/Relations.php"
+code = "string-member-selector"
+message = "This member selector uses a non-literal string type (`string`); its specific value cannot be statically determined."
+count = 3
+
+[[issues]]
+file = "src/Relations.php"
+code = "template-constraint-violation"
+message = "Argument type mismatch for template `K`."
+count = 1
+
+[[issues]]
+file = "src/Tide.php"
+code = "mixed-assignment"
+message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
+count = 2
+
+[[issues]]
+file = "src/TidePlugin.php"
+code = "mixed-return-statement"
+message = "Could not infer a precise return type for function `{closure:src/TidePlugin.php:17:13}`. Saw type `mixed`."
+count = 1
+
+[[issues]]
+file = "src/TidePlugin.php"
+code = "mixed-return-statement"
+message = "Could not infer a precise return type for function `{closure:src/TidePlugin.php:18:13}`. Saw type `mixed`."
+count = 1
+
+[[issues]]
+file = "tests/AggregatesTest.php"
+code = "mixed-assignment"
+message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
+count = 1
+
+[[issues]]
+file = "tests/AggregatesTest.php"
+code = "possible-method-access-on-null"
+message = "Attempting to call a method on `null`."
+count = 1
+
+[[issues]]
+file = "tests/ConvenienceTest.php"
+code = "avoid-catching-error"
+message = "Avoid catching 'Error' class instances."
+count = 2
+
+[[issues]]
+file = "tests/ConvenienceTest.php"
+code = "deprecated-method"
+message = 'Call to deprecated method: `PHPUnit\Framework\TestCase::expectExceptionMessage`.'
+count = 8
+
+[[issues]]
+file = "tests/ConvenienceTest.php"
+code = "invalid-argument"
+message = '''Invalid argument type for argument #2 of `Crab\Tide\Table::__construct`: expected `class-string<Crab\Tide\ModelQuery<Crab\Tide\Model>>|null`, but found `class-string('stdClass')`.'''
+count = 1
+
+[[issues]]
+file = "tests/ConvenienceTest.php"
+code = "mixed-argument"
+message = 'Invalid argument type for argument #2 of `PHPUnit\Framework\Assert::assertArrayNotHasKey`: expected `ArrayAccess<array-key, mixed>|array<array-key, mixed>`, but found `mixed`.'
+count = 1
+
+[[issues]]
+file = "tests/ConvenienceTest.php"
+code = "mixed-array-access"
+message = "Unsafe array access on type `mixed`."
+count = 1
+
+[[issues]]
+file = "tests/ConvenienceTest.php"
+code = "mixed-method-access"
+message = "Attempting to access a method on a non-object type (`mixed`)."
+count = 4
+
+[[issues]]
+file = "tests/ConvenienceTest.php"
+code = "non-existent-method"
+message = 'Method `by` does not exist on type `Crab\Tide\ModelQuery`.'
+count = 1
+
+[[issues]]
+file = "tests/ConvenienceTest.php"
+code = "non-existent-method"
+message = 'Method `popular` does not exist on type `Crab\Tide\ModelQuery`.'
+count = 2
+
+[[issues]]
+file = "tests/ConvenienceTest.php"
+code = "possible-method-access-on-null"
+message = "Attempting to call a method on `null`."
+count = 23
+
+[[issues]]
+file = "tests/ConvenienceTest.php"
+code = "possibly-false-argument"
+message = "Argument #1 of function `json_decode` is possibly `false`, but parameter type `string` does not accept it."
+count = 2
+
+[[issues]]
+file = "tests/ConvenienceTest.php"
+code = "possibly-invalid-argument"
+message = 'Possible argument type mismatch for argument #1 of `Crab\Tide\ModelQuery::firstOrCreate`: expected `(closure(): Crab\Tide\Tests\Support\Book)`, but possibly received `(closure(): Crab\Tide\Tests\Support\Author)|(closure(): Crab\Tide\Tests\Support\Book|null)`.'
+count = 1
+
+[[issues]]
+file = "tests/ConvenienceTest.php"
+code = "possibly-null-argument"
+message = "Argument #2 of function `array_map` is possibly `null`, but parameter type `array<array-key, mixed>` does not accept it."
+count = 2
+
+[[issues]]
+file = "tests/ConvenienceTest.php"
+code = "possibly-null-argument"
+message = 'Argument #2 of method `Crab\Tide\Factory::for` is possibly `null`, but parameter type `Crab\Tide\Model` does not accept it.'
+count = 1
+
+[[issues]]
+file = "tests/ConvenienceTest.php"
+code = "possibly-null-property-access"
+message = "Attempting to access a property on a possibly `null` value."
+count = 20
+
+[[issues]]
+file = "tests/ConvenienceTest.php"
+code = "template-constraint-violation"
+message = "Argument type mismatch for template `T`."
+count = 1
+
+[[issues]]
+file = "tests/ConventionsTest.php"
+code = "mixed-method-access"
+message = "Attempting to access a method on a non-object type (`mixed`)."
+count = 2
+
+[[issues]]
+file = "tests/ConventionsTest.php"
+code = "possible-method-access-on-null"
+message = "Attempting to call a method on `null`."
+count = 1
+
+[[issues]]
+file = "tests/ConventionsTest.php"
+code = "possibly-null-argument"
+message = 'Argument #2 of function `array_map` is possibly `null`, but parameter type `array<non-negative-int, Crab\Tide\Tests\TideLabel>` does not accept it.'
+count = 1
+
+[[issues]]
+file = "tests/ConventionsTest.php"
+code = "possibly-null-argument"
+message = 'Argument #2 of function `array_map` is possibly `null`, but parameter type `array<non-negative-int, Crab\Tide\Tests\TideNovel>` does not accept it.'
+count = 1
+
+[[issues]]
+file = "tests/ConventionsTest.php"
+code = "possibly-null-property-access"
+message = "Attempting to access a property on a possibly `null` value."
+count = 5
+
+[[issues]]
+file = "tests/JsonTest.php"
+code = "mixed-argument"
+message = "Invalid argument type for argument #1 of `array_keys`: expected `array<('K.array_keys() extends array-key), ('V.array_keys() extends mixed)>`, but found `mixed`."
+count = 1
+
+[[issues]]
+file = "tests/JsonTest.php"
+code = "mixed-argument"
+message = 'Invalid argument type for argument #2 of `PHPUnit\Framework\Assert::assertArrayNotHasKey`: expected `ArrayAccess<array-key, mixed>|array<array-key, mixed>`, but found `mixed`.'
+count = 1
+
+[[issues]]
+file = "tests/JsonTest.php"
+code = "mixed-array-access"
+message = "Unsafe array access on type `mixed`."
+count = 9
+
+[[issues]]
+file = "tests/JsonTest.php"
+code = "mixed-assignment"
+message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
+count = 2
+
+[[issues]]
+file = "tests/JsonTest.php"
+code = "possible-method-access-on-null"
+message = "Attempting to call a method on `null`."
+count = 3
+
+[[issues]]
+file = "tests/JsonTest.php"
+code = "possibly-invalid-argument"
+message = 'Possible argument type mismatch for argument #1 of `Crab\Tide\Model::load`: expected `list<Crab\Tide\Tests\Support\Book>`, but possibly received `list{Crab\Tide\Tests\Support\Book|null}`.'
+count = 1
+
+[[issues]]
+file = "tests/JsonTest.php"
+code = "possibly-null-property-access"
+message = "Attempting to access a property on a possibly `null` value."
+count = 1
+
+[[issues]]
+file = "tests/ModelMapTest.php"
+code = "deprecated-method"
+message = 'Call to deprecated method: `PHPUnit\Framework\TestCase::expectExceptionMessage`.'
+count = 5
+
+[[issues]]
+file = "tests/ModelMapTest.php"
+code = "less-specific-argument"
+message = 'Argument type mismatch for argument #1 of `Crab\Tide\ModelMap::hydrate`: expected `array<string, mixed>`, but provided type `array<array-key, mixed>` is less specific.'
+count = 1
+
+[[issues]]
+file = "tests/ModelMapTest.php"
+code = "mixed-property-access"
+message = "Attempting to access a property on a non-object type (`mixed`)."
+count = 1
+
+[[issues]]
+file = "tests/ModelMapTest.php"
+code = "non-existent-property"
+message = 'Property `$name` does not exist on class `Crab\Tide\Model`.'
+count = 2
+
+[[issues]]
+file = "tests/ModelMapTest.php"
+code = "non-existent-property"
+message = 'Property `$price` does not exist on class `Crab\Tide\Model`.'
+count = 1
+
+[[issues]]
+file = "tests/ModelMapTest.php"
+code = "non-existent-property"
+message = 'Property `$settings` does not exist on class `Crab\Tide\Model`.'
+count = 1
+
+[[issues]]
+file = "tests/ModelMapTest.php"
+code = "non-existent-property"
+message = 'Property `$uppercase` does not exist on class `Crab\Tide\Model`.'
+count = 1
+
+[[issues]]
+file = "tests/ModelMapTest.php"
+code = "possibly-null-property-access"
+message = "Attempting to access a property on a possibly `null` value."
+count = 1
+
+[[issues]]
+file = "tests/ModelMapTest.php"
+code = "unknown-class-instantiation"
+message = "Cannot determine the concrete class for instantiation."
+count = 1
+
+[[issues]]
+file = "tests/ModelQueryTest.php"
+code = "less-specific-nested-argument-type"
+message = "Argument type mismatch for argument #1 of `array_combine`: expected `array<array-key, ('K.array_combine() extends array-key)>`, but provided type `list<mixed>` is less specific."
+count = 1
+
+[[issues]]
+file = "tests/ModelQueryTest.php"
+code = "possible-method-access-on-null"
+message = "Attempting to call a method on `null`."
+count = 1
+
+[[issues]]
+file = "tests/ModelQueryTest.php"
+code = "possibly-invalid-argument"
+message = '''Possible argument type mismatch for argument #1 of `Crab\Tide\ModelNotFound::__construct`: expected `class-string<Crab\Tide\Model>`, but possibly received `string('App\Models\OrderItem')`.'''
+count = 1
+
+[[issues]]
+file = "tests/ModelQueryTest.php"
+code = "possibly-null-property-access"
+message = "Attempting to access a property on a possibly `null` value."
+count = 5
+
+[[issues]]
+file = "tests/ModelQueryTest.php"
+code = "string-member-selector"
+message = "This member selector uses a non-literal string type (`string`); its specific value cannot be statically determined."
+count = 2
+
+[[issues]]
+file = "tests/ModelQueryTest.php"
+code = "template-constraint-violation"
+message = "Argument type mismatch for template `K`."
+count = 1
+
+[[issues]]
+file = "tests/MorphTest.php"
+code = "deprecated-method"
+message = 'Call to deprecated method: `PHPUnit\Framework\TestCase::expectExceptionMessage`.'
+count = 1
+
+[[issues]]
+file = "tests/MorphTest.php"
+code = "invalid-argument"
+message = '''Invalid argument type for argument #1 of `array_map`: expected `(callable(Crab\Tide\Model): string)|(callable(Crab\Tide\Model, ('S.array_map() extends mixed)): string)|null`, but found `(closure(Crab\Tide\Tests\MorphComment): string)`.'''
+count = 1
+
+[[issues]]
+file = "tests/MorphTest.php"
+code = "possible-method-access-on-null"
+message = "Attempting to call a method on `null`."
+count = 9
+
+[[issues]]
+file = "tests/MorphTest.php"
+code = "possibly-invalid-argument"
+message = 'Possible argument type mismatch for argument #1 of `Crab\Tide\Tests\MorphTest::bodies`: expected `list<Crab\Tide\Model>`, but possibly received `array<array-key, mixed>`.'
+count = 2
+
+[[issues]]
+file = "tests/MorphTest.php"
+code = "possibly-invalid-argument"
+message = 'Possible argument type mismatch for argument #1 of `Crab\Tide\Tests\MorphTest::bodies`: expected `list<Crab\Tide\Model>`, but possibly received `array<array-key, mixed>|null`.'
+count = 3
+
+[[issues]]
+file = "tests/MorphTest.php"
+code = "possibly-invalid-argument"
+message = '''Possible argument type mismatch for argument #1 of `ReflectionProperty::__construct`: expected `('T.reflectionproperty extends object)|class-string<'T.reflectionproperty extends object>`, but possibly received `Crab\Tide\Tests\MorphComment|null`.'''
+count = 1
+
+[[issues]]
+file = "tests/MorphTest.php"
+code = "possibly-null-argument"
+message = 'Argument #1 of method `Crab\Tide\Tests\MorphTest::bodies` is possibly `null`, but parameter type `list<Crab\Tide\Model>` does not accept it.'
+count = 3
+
+[[issues]]
+file = "tests/MorphTest.php"
+code = "possibly-null-argument"
+message = "Argument #1 of method `ReflectionProperty::__construct` is possibly `null`, but parameter type `('T.reflectionproperty extends object)|class-string<'T.reflectionproperty extends object>` does not accept it."
+count = 1
+
+[[issues]]
+file = "tests/MorphTest.php"
+code = "possibly-null-property-access"
+message = "Attempting to access a property on a possibly `null` value."
+count = 13
+
+[[issues]]
+file = "tests/MorphToManyTest.php"
+code = "invalid-argument"
+message = '''Invalid argument type for argument #1 of `array_map`: expected `(callable(Crab\Tide\Model): string)|(callable(Crab\Tide\Model, ('S.array_map() extends mixed)): string)|null`, but found `(closure(Crab\Tide\Tests\Label): string)`.'''
+count = 1
+
+[[issues]]
+file = "tests/MorphToManyTest.php"
+code = "method-access-on-null"
+message = "Attempting to call a method on `null`."
+count = 7
+
+[[issues]]
+file = "tests/MorphToManyTest.php"
+code = "mixed-argument"
+message = 'Invalid argument type for argument #1 of `Crab\Tide\Tests\MorphToManyTest::names`: expected `list<Crab\Tide\Model>`, but found `mixed`.'
+count = 3
+
+[[issues]]
+file = "tests/MorphToManyTest.php"
+code = "mixed-method-access"
+message = "Attempting to access a method on a non-object type (`mixed`)."
+count = 6
+
+[[issues]]
+file = "tests/MorphToManyTest.php"
+code = "possible-method-access-on-null"
+message = "Attempting to call a method on `null`."
+count = 13
+
+[[issues]]
+file = "tests/MorphToManyTest.php"
+code = "possibly-null-argument"
+message = "Argument #1 of function `array_column` is possibly `null`, but parameter type `array<array-key, array<string('title'), ('V.array_column() extends mixed)>|object>|list<array<string('title'), ('V.array_column() extends mixed)>|object>` does not accept it."
+count = 2
+
+[[issues]]
+file = "tests/MorphToManyTest.php"
+code = "possibly-null-argument"
+message = 'Argument #1 of method `Crab\Tide\Tests\MorphToManyTest::names` is possibly `null`, but parameter type `list<Crab\Tide\Model>` does not accept it.'
+count = 2
+
+[[issues]]
+file = "tests/MorphToManyTest.php"
+code = "possibly-null-property-access"
+message = "Attempting to access a property on a possibly `null` value."
+count = 5
+
+[[issues]]
+file = "tests/NamedDatabaseTest.php"
+code = "mixed-argument"
+message = 'Invalid argument type for argument #2 of `PHPUnit\Framework\Assert::assertStringContainsString`: expected `string`, but found `mixed`.'
+count = 1
+
+[[issues]]
+file = "tests/NamedDatabaseTest.php"
+code = "mixed-property-access"
+message = "Attempting to access a property on a non-object type (`mixed`)."
+count = 2
+
+[[issues]]
+file = "tests/NamedDatabaseTest.php"
+code = "non-existent-property"
+message = 'Property `$label` does not exist on class `Crab\Tide\Model`.'
+count = 1
+
+[[issues]]
+file = "tests/NamedDatabaseTest.php"
+code = "possible-method-access-on-null"
+message = "Attempting to call a method on `null`."
+count = 1
+
+[[issues]]
+file = "tests/NamedDatabaseTest.php"
+code = "possibly-null-argument"
+message = "Argument #1 of function `count` is possibly `null`, but parameter type `Countable|array<array-key, mixed>` does not accept it."
+count = 1
+
+[[issues]]
+file = "tests/NamedDatabaseTest.php"
+code = "possibly-null-array-access"
+message = "Cannot perform array access on possibly `null` value."
+count = 2
+
+[[issues]]
+file = "tests/NamedDatabaseTest.php"
+code = "possibly-null-property-access"
+message = "Attempting to access a property on a possibly `null` value."
+count = 8
+
+[[issues]]
+file = "tests/NamedDatabaseTest.php"
+code = "possibly-undefined-variable"
+message = "Variable `$message` might not have been defined on all execution paths leading to this point."
+count = 1
+
+[[issues]]
+file = "tests/PackageBoundaryTest.php"
+code = "possibly-false-argument"
+message = "Argument #2 of function `preg_match_all` is possibly `false`, but parameter type `string` does not accept it."
+count = 1
+
+[[issues]]
+file = "tests/PackageBoundaryTest.php"
+code = "possibly-false-argument"
+message = 'Argument #2 of method `PHPUnit\Framework\Assert::assertDoesNotMatchRegularExpression` is possibly `false`, but parameter type `string` does not accept it.'
+count = 1
+
+[[issues]]
+file = "tests/PackageBoundaryTest.php"
+code = "possibly-false-argument"
+message = 'Argument #2 of method `PHPUnit\Framework\Assert::assertStringContainsString` is possibly `false`, but parameter type `string` does not accept it.'
+count = 1
+
+[[issues]]
+file = "tests/PackageBoundaryTest.php"
+code = "possibly-false-iterator"
+message = "Expression being iterated (type `false|list<non-empty-string>`) might be `false` at runtime."
+count = 1
+
+[[issues]]
+file = "tests/PackageBoundaryTest.php"
+code = "possibly-undefined-variable"
+message = "Variable `$names` might not have been defined on all execution paths leading to this point."
+count = 1
+
+[[issues]]
+file = "tests/QueryLoanTest.php"
+code = "deprecated-method"
+message = 'Call to deprecated method: `PHPUnit\Framework\TestCase::expectExceptionMessage`.'
+count = 1
+
+[[issues]]
+file = "tests/QueryLoanTest.php"
+code = "impossible-type-comparison"
+message = "Impossible type assertion: `$rollback` of type `null` can never be `string('rollback competitor')`."
+count = 1
+
+[[issues]]
+file = "tests/QueryLoanTest.php"
+code = "mixed-argument"
+message = 'Invalid argument type for `$q` of `{closure:tests/QueryLoanTest.php:25:13}`: expected `Crab\Tide\ModelQuery<Crab\Tide\Model>`, but found `mixed`.'
+count = 1
+
+[[issues]]
+file = "tests/QueryLoanTest.php"
+code = "mixed-argument"
+message = 'Invalid argument type for `$q` of `{closure:tests/QueryLoanTest.php:26:13}`: expected `Crab\Tide\ModelQuery<Crab\Tide\Model>`, but found `mixed`.'
+count = 1
+
+[[issues]]
+file = "tests/QueryLoanTest.php"
+code = "mixed-argument"
+message = 'Invalid argument type for `$q` of `{closure:tests/QueryLoanTest.php:27:13}`: expected `Crab\Tide\ModelQuery<Crab\Tide\Model>`, but found `mixed`.'
+count = 1
+
+[[issues]]
+file = "tests/QueryLoanTest.php"
+code = "mixed-argument"
+message = 'Invalid argument type for `$q` of `{closure:tests/QueryLoanTest.php:28:13}`: expected `Crab\Tide\ModelQuery<Crab\Tide\Model>`, but found `mixed`.'
+count = 1
+
+[[issues]]
+file = "tests/QueryLoanTest.php"
+code = "mixed-argument"
+message = 'Invalid argument type for `$q` of `{closure:tests/QueryLoanTest.php:29:13}`: expected `Crab\Tide\ModelQuery<Crab\Tide\Model>`, but found `mixed`.'
+count = 1
+
+[[issues]]
+file = "tests/QueryLoanTest.php"
+code = "mixed-argument"
+message = 'Invalid argument type for `$q` of `{closure:tests/QueryLoanTest.php:30:13}`: expected `Crab\Tide\ModelQuery<Crab\Tide\Model>`, but found `mixed`.'
+count = 1
+
+[[issues]]
+file = "tests/QueryLoanTest.php"
+code = "mixed-argument"
+message = 'Invalid argument type for `$q` of `{closure:tests/QueryLoanTest.php:31:13}`: expected `Crab\Tide\ModelQuery<Crab\Tide\Model>`, but found `mixed`.'
+count = 1
+
+[[issues]]
+file = "tests/QueryLoanTest.php"
+code = "mixed-argument"
+message = 'Invalid argument type for `$q` of `{closure:tests/QueryLoanTest.php:32:13}`: expected `Crab\Tide\ModelQuery<Crab\Tide\Model>`, but found `mixed`.'
+count = 1
+
+[[issues]]
+file = "tests/QueryLoanTest.php"
+code = "mixed-argument"
+message = 'Invalid argument type for `$q` of `{closure:tests/QueryLoanTest.php:33:13}`: expected `Crab\Tide\ModelQuery<Crab\Tide\Model>`, but found `mixed`.'
+count = 1
+
+[[issues]]
+file = "tests/QueryLoanTest.php"
+code = "mixed-argument"
+message = 'Invalid argument type for `$q` of `{closure:tests/QueryLoanTest.php:34:13}`: expected `Crab\Tide\ModelQuery<Crab\Tide\Model>`, but found `mixed`.'
+count = 1
+
+[[issues]]
+file = "tests/QueryLoanTest.php"
+code = "mixed-argument"
+message = 'Invalid argument type for `$q` of `{closure:tests/QueryLoanTest.php:35:13}`: expected `Crab\Tide\ModelQuery<Crab\Tide\Model>`, but found `mixed`.'
+count = 1
+
+[[issues]]
+file = "tests/QueryLoanTest.php"
+code = "mixed-argument"
+message = 'Invalid argument type for `$q` of `{closure:tests/QueryLoanTest.php:36:13}`: expected `Crab\Tide\ModelQuery<Crab\Tide\Model>`, but found `mixed`.'
+count = 1
+
+[[issues]]
+file = "tests/QueryLoanTest.php"
+code = "mixed-argument"
+message = 'Invalid argument type for `$q` of `{closure:tests/QueryLoanTest.php:37:13}`: expected `Crab\Tide\ModelQuery<Crab\Tide\Model>`, but found `mixed`.'
+count = 1
+
+[[issues]]
+file = "tests/QueryLoanTest.php"
+code = "mixed-argument"
+message = 'Invalid argument type for `$q` of `{closure:tests/QueryLoanTest.php:38:13}`: expected `Crab\Tide\ModelQuery<Crab\Tide\Model>`, but found `mixed`.'
+count = 1
+
+[[issues]]
+file = "tests/QueryLoanTest.php"
+code = "mixed-argument"
+message = 'Invalid argument type for `$q` of `{closure:tests/QueryLoanTest.php:39:13}`: expected `Crab\Tide\ModelQuery<Crab\Tide\Model>`, but found `mixed`.'
+count = 1
+
+[[issues]]
+file = "tests/QueryLoanTest.php"
+code = "mixed-argument"
+message = 'Invalid argument type for `$q` of `{closure:tests/QueryLoanTest.php:40:13}`: expected `Crab\Tide\ModelQuery<Crab\Tide\Model>`, but found `mixed`.'
+count = 1
+
+[[issues]]
+file = "tests/QueryLoanTest.php"
+code = "mixed-assignment"
+message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
+count = 3
+
+[[issues]]
+file = "tests/QueryLoanTest.php"
+code = "mixed-clone"
+message = "Cannot statically verify `clone` on a `mixed` type."
+count = 16
+
+[[issues]]
+file = "tests/QueryLoanTest.php"
+code = "mixed-method-access"
+message = "Attempting to access a method on a non-object type (`mixed`)."
+count = 3
+
+[[issues]]
+file = "tests/QueryLoanTest.php"
+code = "mixed-property-access"
+message = "Attempting to access a property on a non-object type (`mixed`)."
+count = 1
+
+[[issues]]
+file = "tests/QueryLoanTest.php"
+code = "possible-method-access-on-null"
+message = "Attempting to call a method on `null`."
+count = 1
+
+[[issues]]
+file = "tests/QueryLoanTest.php"
+code = "possibly-invalid-argument"
+message = 'Possible argument type mismatch for argument #1 of `Crab\Tide\ModelQuery::loadRelations`: expected `list<Crab\Tide\Model>`, but possibly received `list{Crab\Tide\Tests\Support\Book|null}`.'
+count = 1
+
+[[issues]]
+file = "tests/QueryLoanTest.php"
+code = "possibly-invalid-argument"
+message = 'Possible argument type mismatch for argument #2 of `PHPUnit\Framework\Assert::assertStringContainsString`: expected `string`, but possibly received `int|string`.'
+count = 1
+
+[[issues]]
+file = "tests/QueryLoanTest.php"
+code = "possibly-null-property-access"
+message = "Attempting to access a property on a possibly `null` value."
+count = 4
+
+[[issues]]
+file = "tests/ReadmeTest.php"
+code = "ambiguous-object-property-access"
+message = "Cannot statically verify property access on a generic `object` type."
+count = 1
+
+[[issues]]
+file = "tests/ReadmeTest.php"
+code = "invalid-destructuring-source"
+message = "Invalid destructuring assignment: Cannot unpack type `mixed` into variables."
+count = 1
+
+[[issues]]
+file = "tests/ReadmeTest.php"
+code = "mixed-argument"
+message = "Invalid argument type for argument #1 of `array_slice`: expected `array<('K.array_slice() extends array-key), ('V.array_slice() extends mixed)>`, but found `mixed`."
+count = 1
+
+[[issues]]
+file = "tests/ReadmeTest.php"
+code = "mixed-argument"
+message = "Invalid argument type for argument #1 of `json_decode`: expected `string`, but found `mixed`."
+count = 1
+
+[[issues]]
+file = "tests/ReadmeTest.php"
+code = "mixed-argument"
+message = 'Invalid argument type for argument #2 of `PHPUnit\Framework\Assert::assertArrayNotHasKey`: expected `ArrayAccess<array-key, mixed>|array<array-key, mixed>`, but found `mixed`.'
+count = 1
+
+[[issues]]
+file = "tests/ReadmeTest.php"
+code = "mixed-argument"
+message = 'Invalid argument type for argument #2 of `PHPUnit\Framework\Assert::assertCount`: expected `Countable|iterable<mixed, mixed>`, but found `mixed`.'
+count = 4
+
+[[issues]]
+file = "tests/ReadmeTest.php"
+code = "mixed-argument"
+message = "Invalid argument type for argument #2 of `array_map`: expected `array<('K.array_map() extends array-key), object>`, but found `mixed`."
+count = 1
+
+[[issues]]
+file = "tests/ReadmeTest.php"
+code = "mixed-array-access"
+message = "Unsafe array access on type `mixed`."
+count = 12
+
+[[issues]]
+file = "tests/ReadmeTest.php"
+code = "mixed-assignment"
+message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
+count = 21
+
+[[issues]]
+file = "tests/ReadmeTest.php"
+code = "mixed-method-access"
+message = "Attempting to access a method on a non-object type (`mixed`)."
+count = 2
+
+[[issues]]
+file = "tests/ReadmeTest.php"
+code = "mixed-property-access"
+message = "Attempting to access a property on a non-object type (`mixed`)."
+count = 12
+
+[[issues]]
+file = "tests/ReadmeTest.php"
+code = "mixed-return-statement"
+message = "Could not infer a precise return type for function `{closure:tests/ReadmeTest.php:85:49}`. Saw type `mixed`."
+count = 1
+
+[[issues]]
+file = "tests/ReadmeTest.php"
+code = "possibly-false-argument"
+message = "Argument #2 of function `preg_match_all` is possibly `false`, but parameter type `string` does not accept it."
+count = 1
+
+[[issues]]
+file = "tests/ReadmeTest.php"
+code = "possibly-undefined-variable"
+message = "Variable `$name` might not have been defined on all execution paths leading to this point."
+count = 1
+
+[[issues]]
+file = "tests/ReadmeTest.php"
+code = "reference-to-undefined-variable"
+message = "Reference created from a previously undefined variable `$matches`."
+count = 1
+
+[[issues]]
+file = "tests/RelationEdgeTest.php"
+code = "deprecated-method"
+message = 'Call to deprecated method: `PHPUnit\Framework\TestCase::expectExceptionMessage`.'
+count = 3
+
+[[issues]]
+file = "tests/RelationEdgeTest.php"
+code = "invalid-property-access"
+message = "Attempting to access a property on a non-object type (`_`)."
+count = 2
+
+[[issues]]
+file = "tests/RelationEdgeTest.php"
+code = "less-specific-nested-argument-type"
+message = "Argument type mismatch for argument #1 of `array_column`: expected `array<array-key, array<string('id'), ('V.array_column() extends mixed)>|object>|list<array<string('id'), ('V.array_column() extends mixed)>|object>`, but provided type `array<array-key, mixed>` is less specific."
+count = 2
+
+[[issues]]
+file = "tests/RelationEdgeTest.php"
+code = "less-specific-nested-argument-type"
+message = "Argument type mismatch for argument #1 of `array_column`: expected `array<array-key, array<string('id'), ('V.array_column() extends mixed)>|object>|list<array<string('id'), ('V.array_column() extends mixed)>|object>`, but provided type `array<array-key, mixed>|null` is less specific."
+count = 3
+
+[[issues]]
+file = "tests/RelationEdgeTest.php"
+code = "mixed-argument"
+message = 'Invalid argument type for argument #2 of `PHPUnit\Framework\Assert::assertCount`: expected `Countable|iterable<mixed, mixed>`, but found `mixed`.'
+count = 3
+
+[[issues]]
+file = "tests/RelationEdgeTest.php"
+code = "mixed-array-access"
+message = "Unsafe array access on type `mixed`."
+count = 3
+
+[[issues]]
+file = "tests/RelationEdgeTest.php"
+code = "mixed-property-access"
+message = "Attempting to access a property on a non-object type (`mixed`)."
+count = 1
+
+[[issues]]
+file = "tests/RelationEdgeTest.php"
+code = "non-existent-property"
+message = 'Property `$foreignKey` does not exist on class `Crab\Tide\BelongsToMany`.'
+count = 1
+
+[[issues]]
+file = "tests/RelationEdgeTest.php"
+code = "non-existent-property"
+message = 'Property `$foreignKey` does not exist on class `Crab\Tide\MorphMany`.'
+count = 1
+
+[[issues]]
+file = "tests/RelationEdgeTest.php"
+code = "non-existent-property"
+message = 'Property `$foreignKey` does not exist on class `Crab\Tide\MorphOne`.'
+count = 1
+
+[[issues]]
+file = "tests/RelationEdgeTest.php"
+code = "non-existent-property"
+message = 'Property `$foreignKey` does not exist on class `Crab\Tide\MorphTo`.'
+count = 1
+
+[[issues]]
+file = "tests/RelationEdgeTest.php"
+code = "non-existent-property"
+message = 'Property `$id` does not exist on class `Crab\Tide\Model`.'
+count = 1
+
+[[issues]]
+file = "tests/RelationEdgeTest.php"
+code = "null-argument"
+message = 'Argument #2 of method `PHPUnit\Framework\Assert::assertCount` is `null`, but parameter type `Countable|iterable<mixed, mixed>` does not accept it.'
+count = 1
+
+[[issues]]
+file = "tests/RelationEdgeTest.php"
+code = "null-array-access"
+message = "Cannot perform array access on `null`."
+count = 3
+
+[[issues]]
+file = "tests/RelationEdgeTest.php"
+code = "null-property-access"
+message = "Attempting to access a property on an expression that is always `null`."
+count = 1
+
+[[issues]]
+file = "tests/RelationEdgeTest.php"
+code = "possible-method-access-on-null"
+message = "Attempting to call a method on `null`."
+count = 3
+
+[[issues]]
+file = "tests/RelationEdgeTest.php"
+code = "possibly-invalid-argument"
+message = 'Possible argument type mismatch for argument #1 of `Crab\Tide\Model::load`: expected `list<Crab\Tide\Tests\Support\Book>`, but possibly received `list{Crab\Tide\Tests\Support\Book|null}`.'
+count = 1
+
+[[issues]]
+file = "tests/RelationEdgeTest.php"
+code = "possibly-null-argument"
+message = "Argument #1 of function `array_column` is possibly `null`, but parameter type `array<array-key, array<string('id'), ('V.array_column() extends mixed)>|object>|list<array<string('id'), ('V.array_column() extends mixed)>|object>` does not accept it."
+count = 3
+
+[[issues]]
+file = "tests/RelationEdgeTest.php"
+code = "possibly-null-array-access"
+message = "Cannot perform array access on possibly `null` value."
+count = 1
+
+[[issues]]
+file = "tests/RelationEdgeTest.php"
+code = "possibly-null-property-access"
+message = "Attempting to access a property on a possibly `null` value."
+count = 15
+
+[[issues]]
+file = "tests/RelationsTest.php"
+code = "avoid-catching-error"
+message = "Avoid catching 'Error' class instances."
+count = 1
+
+[[issues]]
+file = "tests/RelationsTest.php"
+code = "deprecated-method"
+message = 'Call to deprecated method: `PHPUnit\Framework\TestCase::expectExceptionMessage`.'
+count = 2
+
+[[issues]]
+file = "tests/RelationsTest.php"
+code = "impossible-type-comparison"
+message = "Impossible type assertion: `$books[0]->author->name` of type `null` can never be `string('Ada')`."
+count = 1
+
+[[issues]]
+file = "tests/RelationsTest.php"
+code = "impossible-type-comparison"
+message = "Impossible type assertion: `$books[0]->chapters[0]->notes[0]->body` of type `null` can never be `string('A note')`."
+count = 1
+
+[[issues]]
+file = "tests/RelationsTest.php"
+code = "impossible-type-comparison"
+message = "Impossible type assertion: `$books[0]->chapters[1]->notes` of type `null` can never be `array{}`."
+count = 1
+
+[[issues]]
+file = "tests/RelationsTest.php"
+code = "impossible-type-comparison"
+message = "Impossible type assertion: `$books[0]->isbn->code` of type `null` can never be `string('first')`."
+count = 1
+
+[[issues]]
+file = "tests/RelationsTest.php"
+code = "impossible-type-comparison"
+message = "Impossible type assertion: `$books[0]->isbn->code` of type `null` can never be `string('second')`."
+count = 1
+
+[[issues]]
+file = "tests/RelationsTest.php"
+code = "impossible-type-comparison"
+message = "Impossible type assertion: `$books[3]->chapters` of type `null` can never be `array{}`."
+count = 1
+
+[[issues]]
+file = "tests/RelationsTest.php"
+code = "impossible-type-comparison"
+message = "Impossible type assertion: `$books[3]->tags` of type `null` can never be `array{}`."
+count = 1
+
+[[issues]]
+file = "tests/RelationsTest.php"
+code = "invalid-property-access"
+message = "Attempting to access a property on a non-object type (`_`)."
+count = 13
+
+[[issues]]
+file = "tests/RelationsTest.php"
+code = "less-specific-nested-argument-type"
+message = "Argument type mismatch for argument #1 of `array_column`: expected `array<array-key, array<string('id'), ('V.array_column() extends mixed)>|object>|list<array<string('id'), ('V.array_column() extends mixed)>|object>`, but provided type `array<array-key, mixed>` is less specific."
+count = 2
+
+[[issues]]
+file = "tests/RelationsTest.php"
+code = "match-not-exhaustive"
+message = "Non-exhaustive `match` expression: subject of type `string` is not fully handled."
+count = 1
+
+[[issues]]
+file = "tests/RelationsTest.php"
+code = "mixed-argument"
+message = 'Invalid argument type for argument #2 of `PHPUnit\Framework\Assert::assertCount`: expected `Countable|iterable<mixed, mixed>`, but found `mixed`.'
+count = 2
+
+[[issues]]
+file = "tests/RelationsTest.php"
+code = "mixed-argument"
+message = 'Invalid argument type for argument #2 of `PHPUnit\Framework\Assert::assertStringContainsString`: expected `string`, but found `mixed`.'
+count = 1
+
+[[issues]]
+file = "tests/RelationsTest.php"
+code = "mixed-array-access"
+message = "Unsafe array access on type `mixed`."
+count = 2
+
+[[issues]]
+file = "tests/RelationsTest.php"
+code = "mixed-property-access"
+message = "Attempting to access a property on a non-object type (`mixed`)."
+count = 1
+
+[[issues]]
+file = "tests/RelationsTest.php"
+code = "no-value"
+message = 'Argument #2 passed to method `PHPUnit\Framework\Assert::assertSame` has type `never`, meaning it cannot produce a value.'
+count = 1
+
+[[issues]]
+file = "tests/RelationsTest.php"
+code = "non-existent-property"
+message = 'Property `$code` does not exist on class `Crab\Tide\Model`.'
+count = 1
+
+[[issues]]
+file = "tests/RelationsTest.php"
+code = "non-existent-property"
+message = 'Property `$name` does not exist on class `Crab\Tide\Model`.'
+count = 1
+
+[[issues]]
+file = "tests/RelationsTest.php"
+code = "null-argument"
+message = "Argument #1 of function `array_column` is `null`, but parameter type `array<array-key, array<string('id'), ('V.array_column() extends mixed)>|object>|list<array<string('id'), ('V.array_column() extends mixed)>|object>` does not accept it."
+count = 3
+
+[[issues]]
+file = "tests/RelationsTest.php"
+code = "null-array-access"
+message = "Cannot perform array access on `null`."
+count = 5
+
+[[issues]]
+file = "tests/RelationsTest.php"
+code = "null-property-access"
+message = "Attempting to access a property on an expression that is always `null`."
+count = 6
+
+[[issues]]
+file = "tests/RelationsTest.php"
+code = "possible-method-access-on-null"
+message = "Attempting to call a method on `null`."
+count = 6
+
+[[issues]]
+file = "tests/RelationsTest.php"
+code = "possibly-invalid-argument"
+message = 'Possible argument type mismatch for argument #1 of `Crab\Tide\Model::load`: expected `list<Crab\Tide\Tests\Support\Book>`, but possibly received `list{Crab\Tide\Tests\Support\Author|null}`.'
+count = 1
+
+[[issues]]
+file = "tests/RelationsTest.php"
+code = "possibly-null-property-access"
+message = "Attempting to access a property on a possibly `null` value."
+count = 2
+
+[[issues]]
+file = "tests/RelationsTest.php"
+code = "possibly-undefined-variable"
+message = "Variable `$message` might not have been defined on all execution paths leading to this point."
+count = 1
+
+[[issues]]
+file = "tests/RelationsTest.php"
+code = "unused-statement"
+message = "Expression has no effect as a statement"
+count = 1
+
+[[issues]]
+file = "tests/ReviewFixesTest.php"
+code = "deprecated-method"
+message = 'Call to deprecated method: `PHPUnit\Framework\TestCase::expectExceptionMessage`.'
+count = 1
+
+[[issues]]
+file = "tests/ReviewFixesTest.php"
+code = "impossible-type-comparison"
+message = "Impossible type assertion: `$books[0]->first->id` of type `int(1)` can never be `int(101)`."
+count = 1
+
+[[issues]]
+file = "tests/ReviewFixesTest.php"
+code = "less-specific-nested-argument-type"
+message = "Argument type mismatch for argument #1 of `array_column`: expected `array<array-key, array<string('id'), ('V.array_column() extends mixed)>|object>|list<array<string('id'), ('V.array_column() extends mixed)>|object>`, but provided type `array<array-key, mixed>|null` is less specific."
+count = 1
+
+[[issues]]
+file = "tests/ReviewFixesTest.php"
+code = "less-specific-nested-argument-type"
+message = "Argument type mismatch for argument #1 of `array_diff`: expected `array<array-key, int(2)|int(4)>`, but provided type `array<array-key, mixed>` is less specific."
+count = 1
+
+[[issues]]
+file = "tests/ReviewFixesTest.php"
+code = "mixed-property-access"
+message = "Attempting to access a property on a non-object type (`mixed`)."
+count = 1
+
+[[issues]]
+file = "tests/ReviewFixesTest.php"
+code = "possible-method-access-on-null"
+message = "Attempting to call a method on `null`."
+count = 17
+
+[[issues]]
+file = "tests/ReviewFixesTest.php"
+code = "possibly-invalid-argument"
+message = 'Possible argument type mismatch for argument #1 of `Crab\Tide\Model::load`: expected `list<Crab\Tide\Tests\UnsafeVirtual>`, but possibly received `list{Crab\Tide\Tests\UnsafeVirtual|null}`.'
+count = 1
+
+[[issues]]
+file = "tests/ReviewFixesTest.php"
+code = "possibly-null-argument"
+message = "Argument #1 of function `array_column` is possibly `null`, but parameter type `array<array-key, array<string('id'), ('V.array_column() extends mixed)>|object>|list<array<string('id'), ('V.array_column() extends mixed)>|object>` does not accept it."
+count = 1
+
+[[issues]]
+file = "tests/ReviewFixesTest.php"
+code = "possibly-null-array-access"
+message = "Cannot perform array access on possibly `null` value."
+count = 1
+
+[[issues]]
+file = "tests/ReviewFixesTest.php"
+code = "possibly-null-property-access"
+message = "Attempting to access a property on a possibly `null` value."
+count = 13
+
+[[issues]]
+file = "tests/ReviewFixesTest.php"
+code = "template-constraint-violation"
+message = "Argument type mismatch for template `V`."
+count = 1
+
+[[issues]]
+file = "tests/RollbackTest.php"
+code = "possible-method-access-on-null"
+message = "Attempting to call a method on `null`."
+count = 5
+
+[[issues]]
+file = "tests/RollbackTest.php"
+code = "possibly-null-property-access"
+message = "Attempting to access a property on a possibly `null` value."
+count = 2
+
+[[issues]]
+file = "tests/SaveTest.php"
+code = "deprecated-method"
+message = 'Call to deprecated method: `PHPUnit\Framework\TestCase::expectExceptionMessage`.'
+count = 1
+
+[[issues]]
+file = "tests/SaveTest.php"
+code = "impossible-type-comparison"
+message = "Impossible type assertion: `$author->name` of type `string('ASSIGNED')` can never be `string(' RAW ')`."
+count = 1
+
+[[issues]]
+file = "tests/SaveTest.php"
+code = "match-not-exhaustive"
+message = "Non-exhaustive `match` expression: subject of type `string` is not fully handled."
+count = 1
+
+[[issues]]
+file = "tests/SaveTest.php"
+code = "method-access-on-null"
+message = "Attempting to call a method on `null`."
+count = 1
+
+[[issues]]
+file = "tests/SaveTest.php"
+code = "mismatched-array-index"
+message = "Invalid array key type: `int(0)` is not a valid key for this array."
+count = 1
+
+[[issues]]
+file = "tests/SaveTest.php"
+code = "mixed-argument"
+message = 'Invalid argument type for argument #2 of `PHPUnit\Framework\Assert::assertStringContainsString`: expected `string`, but found `mixed`.'
+count = 2
+
+[[issues]]
+file = "tests/SaveTest.php"
+code = "mixed-array-assignment"
+message = "Unsafe array assignment on type `mixed`."
+count = 1
+
+[[issues]]
+file = "tests/SaveTest.php"
+code = "no-value"
+message = 'Argument #2 passed to method `PHPUnit\Framework\Assert::assertCount` has type `never`, meaning it cannot produce a value.'
+count = 1
+
+[[issues]]
+file = "tests/SaveTest.php"
+code = "null-argument"
+message = 'Argument #2 of method `PHPUnit\Framework\Assert::assertStringContainsString` is `null`, but parameter type `string` does not accept it.'
+count = 1
+
+[[issues]]
+file = "tests/SaveTest.php"
+code = "null-array-access"
+message = "Cannot perform array access on `null`."
+count = 1
+
+[[issues]]
+file = "tests/SaveTest.php"
+code = "possible-method-access-on-null"
+message = "Attempting to call a method on `null`."
+count = 24
+
+[[issues]]
+file = "tests/SaveTest.php"
+code = "possibly-invalid-clone"
+message = 'Expression of type `Crab\Tide\Tests\Support\Book|null` might not be a cloneable object.'
+count = 1
+
+[[issues]]
+file = "tests/SaveTest.php"
+code = "possibly-null-property-access"
+message = "Attempting to access a property on a possibly `null` value."
+count = 39
+
+[[issues]]
+file = "tests/SaveTest.php"
+code = "possibly-undefined-variable"
+message = "Variable `$actual` might not have been defined on all execution paths leading to this point."
+count = 1
+
+[[issues]]
+file = "tests/SaveTest.php"
+code = "possibly-undefined-variable"
+message = "Variable `$insertFailed` might not have been defined on all execution paths leading to this point."
+count = 1
+
+[[issues]]
+file = "tests/SaveTest.php"
+code = "possibly-undefined-variable"
+message = "Variable `$message` might not have been defined on all execution paths leading to this point."
+count = 1
+
+[[issues]]
+file = "tests/SaveTest.php"
+code = "possibly-undefined-variable"
+message = "Variable `$updateFailed` might not have been defined on all execution paths leading to this point."
+count = 1
+
+[[issues]]
+file = "tests/SecondReviewTest.php"
+code = "mixed-return-statement"
+message = "Could not infer a precise return type for function `{closure:tests/SecondReviewTest.php:126:49}`. Saw type `mixed`."
+count = 1
+
+[[issues]]
+file = "tests/SecondReviewTest.php"
+code = "non-existent-property"
+message = 'Property `$name` does not exist on class `Crab\Tide\Model`.'
+count = 2
+
+[[issues]]
+file = "tests/SecondReviewTest.php"
+code = "possible-method-access-on-null"
+message = "Attempting to call a method on `null`."
+count = 6
+
+[[issues]]
+file = "tests/SecondReviewTest.php"
+code = "possibly-null-argument"
+message = 'Argument #2 of function `array_map` is possibly `null`, but parameter type `array<non-negative-int, Crab\Tide\Tests\TaggingTag>` does not accept it.'
+count = 1
+
+[[issues]]
+file = "tests/SecondReviewTest.php"
+code = "possibly-null-property-access"
+message = "Attempting to access a property on a possibly `null` value."
+count = 2
+
+[[issues]]
+file = "tests/SelectTest.php"
+code = "deprecated-method"
+message = 'Call to deprecated method: `PHPUnit\Framework\TestCase::expectExceptionMessage`.'
+count = 2
+
+[[issues]]
+file = "tests/SelectTest.php"
+code = "mixed-argument"
+message = "Invalid argument type for argument #1 of `array_column`: expected `array<array-key, array<string('title'), ('V.array_column() extends mixed)>|object>|list<array<string('title'), ('V.array_column() extends mixed)>|object>`, but found `mixed`."
+count = 1
+
+[[issues]]
+file = "tests/SelectTest.php"
+code = "mixed-argument"
+message = "Invalid argument type for argument #1 of `array_keys`: expected `array<('K.array_keys() extends array-key), ('V.array_keys() extends mixed)>`, but found `mixed`."
+count = 1
+
+[[issues]]
+file = "tests/SelectTest.php"
+code = "mixed-property-access"
+message = "Attempting to access a property on a non-object type (`mixed`)."
+count = 3
+
+[[issues]]
+file = "tests/SelectTest.php"
+code = "mixed-return-statement"
+message = "Could not infer a precise return type for function `{closure:tests/SelectTest.php:134:23}`. Saw type `mixed`."
+count = 1
+
+[[issues]]
+file = "tests/SelectTest.php"
+code = "possible-method-access-on-null"
+message = "Attempting to call a method on `null`."
+count = 4
+
+[[issues]]
+file = "tests/SelectTest.php"
+code = "possibly-false-argument"
+message = "Argument #1 of function `json_decode` is possibly `false`, but parameter type `string` does not accept it."
+count = 1
+
+[[issues]]
+file = "tests/SelectTest.php"
+code = "possibly-invalid-argument"
+message = '''Possible argument type mismatch for argument #1 of `ReflectionProperty::__construct`: expected `('T.reflectionproperty extends object)|class-string<'T.reflectionproperty extends object>`, but possibly received `Crab\Tide\Tests\DefaultedBook|null`.'''
+count = 1
+
+[[issues]]
+file = "tests/SelectTest.php"
+code = "possibly-invalid-argument"
+message = '''Possible argument type mismatch for argument #1 of `ReflectionProperty::__construct`: expected `('T.reflectionproperty extends object)|class-string<'T.reflectionproperty extends object>`, but possibly received `Crab\Tide\Tests\Support\Book|null`.'''
+count = 1
+
+[[issues]]
+file = "tests/SelectTest.php"
+code = "possibly-null-argument"
+message = "Argument #1 of method `ReflectionProperty::__construct` is possibly `null`, but parameter type `('T.reflectionproperty extends object)|class-string<'T.reflectionproperty extends object>` does not accept it."
+count = 2
+
+[[issues]]
+file = "tests/SelectTest.php"
+code = "possibly-null-property-access"
+message = "Attempting to access a property on a possibly `null` value."
+count = 10
+
+[[issues]]
+file = "tests/SelectTest.php"
+code = "unused-statement"
+message = "Expression has no effect as a statement"
+count = 1
+
+[[issues]]
+file = "tests/Support/DatabaseTestCase.php"
+code = "mixed-argument"
+message = "Invalid argument type for argument #1 of `is_file`: expected `string`, but found `mixed`."
+count = 1
+
+[[issues]]
+file = "tests/Support/DatabaseTestCase.php"
+code = "mixed-argument"
+message = "Invalid argument type for argument #1 of `unlink`: expected `string`, but found `mixed`."
+count = 1
+
+[[issues]]
+file = "tests/Support/DatabaseTestCase.php"
+code = "mixed-assignment"
+message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
+count = 3
+
+[[issues]]
+file = "tests/Support/DatabaseTestCase.php"
+code = "mixed-method-access"
+message = "Attempting to access a method on a non-object type (`mixed`)."
+count = 1
+
+[[issues]]
+file = "tests/Support/DatabaseTestCase.php"
+code = "mixed-operand"
+message = "Invalid left operand: type `mixed` cannot be reliably used in string concatenation."
+count = 2
+
+[[issues]]
+file = "tests/Support/Models.php"
+code = "mixed-property-access"
+message = "Attempting to access a property on a non-object type (`mixed`)."
+count = 1
+
+[[issues]]
+file = "tests/Support/Models.php"
+code = "mixed-return-statement"
+message = 'Could not infer a precise return type for function `Crab\Tide\Tests\Support\AsMoney::write`. Saw type `mixed`.'
+count = 1
+
+[[issues]]
+file = "tests/Support/RecordingDatabase.php"
+code = "never-return"
+message = "Cannot return value with type 'never' from this function."
+count = 1
+
+[[issues]]
+file = "tests/ThirdReviewTest.php"
+code = "non-existent-property"
+message = 'Property `$id` does not exist on class `Crab\Tide\Model`.'
+count = 1
+
+[[issues]]
+file = "tests/ThirdReviewTest.php"
+code = "possible-method-access-on-null"
+message = "Attempting to call a method on `null`."
+count = 7
+
+[[issues]]
+file = "tests/ThirdReviewTest.php"
+code = "possibly-null-property-access"
+message = "Attempting to access a property on a possibly `null` value."
+count = 3
+
+[[issues]]
+file = "tests/TidePluginTest.php"
+code = "deprecated-method"
+message = 'Call to deprecated method: `PHPUnit\Framework\TestCase::expectExceptionMessage`.'
+count = 2
+
+[[issues]]
+file = "tests/TidePluginTest.php"
+code = "impossible-type-comparison"
+message = "Impossible type assertion: `$resolutions` of type `int(0)` can never be `int(1)`."
+count = 1
+
+[[issues]]
+file = "tests/TimestampsTest.php"
+code = "less-specific-nested-return-statement"
+message = '''Returned type `list{mixed, mixed}` is less specific than the declared return type `array{0: null|string, 1: null|string}` for function `Crab\Tide\Tests\TimestampsTest::times` due to nested 'mixed'.'''
+count = 1
+
+[[issues]]
+file = "tests/TimestampsTest.php"
+code = "possible-method-access-on-null"
+message = "Attempting to call a method on `null`."
+count = 1
+
+[[issues]]
+file = "tests/TimestampsTest.php"
+code = "possibly-null-array-access"
+message = "Cannot perform array access on possibly `null` value."
+count = 2
+
+[[issues]]
+file = "tests/TransactionTest.php"
+code = "mixed-assignment"
+message = "Assigning `mixed` type to a variable may lead to unexpected behavior."
+count = 3
+
+[[issues]]
+file = "tests/TransactionTest.php"
+code = "mixed-method-access"
+message = "Attempting to access a method on a non-object type (`mixed`)."
+count = 4
+
+[[issues]]
+file = "tests/TransactionTest.php"
+code = "possibly-null-property-access"
+message = "Attempting to access a property on a possibly `null` value."
+count = 2
