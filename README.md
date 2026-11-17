@@ -264,7 +264,7 @@ $posts = Post::query()
     ->get();   // $posts[0]->comments_count, $posts[0]->long_comments_count
 ```
 
-Where a relation has one count, its name is enough, `withCount('books')`; with several, name the property. A count works with `select()`, on pages, and in a relation's constraint: `with('books', fn (BookQuery $query) => $query->withCount('comments'))`.
+Where a relation has one count, its name is enough, `withCount('books')`; with several, name the property. `Post::loadCount($posts, 'comments')` reads counts into models already read, one statement for every thousand. A count works with `select()`, on pages, and in a relation's constraint: `with('books', fn (BookQuery $query) => $query->withCount('comments'))`.
 
 ### Writing links
 
@@ -300,7 +300,7 @@ $book->save();
 
 `save()` given values assigns them first, as one change: each must be one of the model's columns, and a value of the wrong type is PHP's `TypeError` with nothing assigned. Name the keys yourself. Input passed whole, `$request->all()`, would let a client write any column, `is_admin` for one.
 
-`isDirty()` says whether the model has changes `save()` would write, of any column or of those named; `dirty()` gives them by property, and `original('title')` a column's value as it was read or last saved. A new model's every column with a value is a change.
+`isDirty()` says whether the model has changes `save()` would write, of any column or of those named; `dirty()` gives them by property, and `original('title')` a column's value as it was read or last saved. A new model's every column with a value is a change. After the save, `wasChanged('status')` says whether it wrote that column: an insert writes every column it has, an update what changed and its `updated_at`. A rollback takes it back with the write.
 
 A model that declares `created_at` and `updated_at` as dates has them kept, in PHP's default time zone, the one they are read back in: both when it is first saved, and `updated_at` at each change. A time you set yourself is written as you set it, and a save that changes nothing writes nothing. The time is the application's clock, to the second.
 
@@ -351,9 +351,21 @@ final class BookFactory extends Factory
     }
 }
 
+/** @extends Factory<Author> */
+final class AuthorFactory extends Factory
+{
+    protected function definition(int $sequence): Author
+    {
+        return new Author("Author {$sequence}");
+    }
+}
+
 $made = BookFactory::new()->count(2)->for('author', $author)->state(['internal_note' => 'seeded'])->create();
 $draft = BookFactory::new()->state(fn (Book $book) => $book->title .= ' (draft)')->makeOne();   // not saved
+$prolific = AuthorFactory::new()->has('books', BookFactory::new()->count(2))->createOne();      // $prolific->books
 ```
+
+`for()` gives each model its owner by a `BelongsTo` or `MorphTo`. `has()` creates related models for each one, from another factory, nested as deep as needed: a `HasMany` or `HasOne` and their polymorphic kinds get the key, and a many-to-many relation links them. Only `create()` can do that, as the keys come from the saved rows.
 
 ## JSON and limits
 

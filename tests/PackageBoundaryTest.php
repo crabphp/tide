@@ -36,8 +36,10 @@ final class PackageBoundaryTest extends TestCase
     {
         $model = new \ReflectionClass(Model::class);
         self::assertNull($model->getConstructor());
-        self::assertCount(1, $model->getProperties());
+        // Its snapshot, and which properties the last save() wrote: nothing shared, nothing of the application's.
+        self::assertCount(2, $model->getProperties());
         self::assertTrue($model->getProperty('storedValues')->isPrivate());
+        self::assertTrue($model->getProperty('savedChanges')->isPrivate());
         // A model query chooses rows of its model, and which of its own columns to read, and loads their
         // relations; what cannot be told from the model's types, joins, expressions, raw values, is the builder's.
         self::assertTrue(method_exists(ModelQuery::class, 'select'));

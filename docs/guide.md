@@ -271,7 +271,14 @@ if ($shipped) {
 }
 ```
 
-`dirty()` gives the changes by property, and `original('status')` the value as it was read.
+`dirty()` gives the changes by property, and `original('status')` the value as it was read. After `save()`, `wasChanged('status')` says whether that save wrote the column, for code that runs once the change is made:
+
+```php
+$order->save();
+if ($order->wasChanged('status')) {
+    $this->audit->record($order);
+}
+```
 
 Several models are saved with `save()` for each, in a transaction. Rows written many at once, an import, a counter, the lines of an order, are the query builder's: `$db->table('products')->where('stock', '<', 10)->increment('stock', 60)` is one statement. It does not change models already held.
 
@@ -315,6 +322,12 @@ final class ProductFactory extends Factory
 $products = ProductFactory::new()->count(3)->state(['stock' => 0])->create();   // list<Product>, saved
 $line     = OrderItemFactory::new()->for('product', $product)->createOne();      // by its BelongsTo
 $draft    = ProductFactory::new()->state(fn (Product $p) => $p->price = 0)->makeOne();   // not saved
+```
+
+An order with its lines is one call: `has()` creates related models for each one, with their keys, and nests:
+
+```php
+$order = OrderFactory::new()->has('lines', OrderItemFactory::new()->for('product', $product)->count(3))->createOne();
 ```
 
 Each method returns a new factory, so one built in `setUp()` can be shared.

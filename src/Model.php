@@ -13,6 +13,10 @@ abstract class Model implements \JsonSerializable
      * @var array<string, mixed>|null Null until read or saved; cast objects use their written value.
      */
     private ?array $storedValues = null;
+    /**
+     * @var list<string> The properties the last save() wrote, for wasChanged().
+     */
+    private array $savedChanges = [];
 
     /**
      * @return ModelQuery<static>
@@ -60,6 +64,48 @@ abstract class Model implements \JsonSerializable
     }
 
     /**
+     * Reads counts into models already read, as withCount() does for a query:
+     * one statement for every thousand models, of their keys and the counts.
+     *
+     *     Post::loadCount($posts, 'comments');
+     *
+     * @param list<static> $models
+     */
+    public static function loadCount(array $models, string|\Closure ...$counts): void
+    {
+        if ($models === [] || $counts === []) {
+            return;
+        }
+        $map = ModelMap::of(static::class);
+        $key = $map->requireKey();
+        $byKey = [];
+        foreach ($models as $model) {
+            if ($model::class !== static::class || !$model->stored()) {
+                throw new \LogicException(static::class
+                . '::loadCount() needs stored models of that class; save them first, and pass one class at a time.');
+            }
+            $byKey[$model->storedValues[$key->property]][] = $model;
+        }
+        foreach (array_chunk(array_keys($byKey), 1_000) as $keys) {
+            $counted = static::query()
+                ->select($key->column)
+                ->withCount(...$counts)
+                ->whereIn($key->column, $keys)
+                ->get();
+            foreach ($counted as $read) {
+                foreach ($map->counts as $property => $_) {
+                    if (!$map->initialized($read, $property)) {
+                        continue;
+                    }
+                    foreach ($byKey[$read->storedValues[$key->property] ?? ''] ?? [] as $model) {
+                        $map->assign($model, $property, $map->value($read, $property));
+                    }
+                }
+            }
+        }
+    }
+
+    /**
      * Inserts a new model, or writes what changed on a stored one. Values given
      * are assigned first, by property, as one change: ['title' => 'Beta'].
      * Each must be one of the model's columns, and a value of the wrong type
@@ -90,6 +136,7 @@ abstract class Model implements \JsonSerializable
             $written[$field->column] = $field->toColumn($values[$name]);
         }
         if ($changed === []) {
+            $this->savedChanges = [];
             return $this;
         }
         $stamp = $map->updatedAt;
@@ -121,6 +168,7 @@ abstract class Model implements \JsonSerializable
             $map->assign($this, $stamp->property, $changed[$stamp->property]);
         }
         $this->storedValues = array_replace($this->storedValues, $changed);
+        $this->savedChanges = array_keys($changed);
         foreach ($map->relations as $name => $relation) {
             $columns = match (true) {
                 $relation->attribute instanceof BelongsTo => [$relation->attribute->foreignKey],
@@ -150,6 +198,29 @@ abstract class Model implements \JsonSerializable
         foreach ($properties as $name) {
             self::column($map, $name, 'isDirty');
             if (array_key_exists($name, $dirty)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Whether the last save() wrote any column, or one of those named: an
+     * insert writes every column it has, an update what changed and its
+     * updated_at. A save that changed nothing, refresh() and delete() leave none.
+     *
+     *     $order->save();
+     *     if ($order->wasChanged('status')) { ... }
+     */
+    public function wasChanged(string ...$properties): bool
+    {
+        if ($properties === []) {
+            return $this->savedChanges !== [];
+        }
+        $map = ModelMap::of(static::class);
+        foreach ($properties as $name) {
+            self::column($map, $name, 'wasChanged');
+            if (in_array($name, $this->savedChanges, true)) {
                 return true;
             }
         }
@@ -200,15 +271,16 @@ abstract class Model implements \JsonSerializable
     private function changes(ModelMap $map, array $values): array
     {
         $changed = [];
+        $stored = $this->storedValues ?? [];
         foreach ($values as $name => $value) {
             $field = $map->fields[$name];
             $snapshot = $map->snapshot($field, $value);
             $same =
-                array_key_exists($name, $this->storedValues ?? [])
+                array_key_exists($name, $stored)
                 && (
                     $value instanceof \DateTimeInterface && $field->cast === null
-                        ? ($snapshot <=> $this->storedValues[$name]) === 0
-                        : $snapshot === $this->storedValues[$name]
+                        ? ($snapshot <=> $stored[$name]) === 0
+                        : $snapshot === $stored[$name]
                 );
             if (!$same) {
                 $changed[$name] = $snapshot;
@@ -237,6 +309,8 @@ abstract class Model implements \JsonSerializable
         try {
             foreach ($values as $name => $value) {
                 $before[$name] = $map->initialized($this, $name) ? [$map->value($this, $name)] : null;
+                // Assigned as the application would, so that a set hook runs and PHP checks the type.
+                // @mago-expect analysis:string-member-selector
                 $this->{$name} = $value;
             }
         } catch (\TypeError $error) {
@@ -462,6 +536,7 @@ abstract class Model implements \JsonSerializable
             $stored[$name] = $map->snapshot($map->fields[$name], $value);
         }
         $this->storedValues = $stored;
+        $this->savedChanges = array_keys($stored);
     }
 
     public function delete(): void
@@ -475,6 +550,7 @@ abstract class Model implements \JsonSerializable
         $connection->table($map->table)->where($key->column, $this->storedValues[$key->property])->delete();
         $this->undoneBy($map, $connection, $this->storedValues);
         $this->storedValues = null;
+        $this->savedChanges = [];
     }
 
     /**
@@ -490,8 +566,10 @@ abstract class Model implements \JsonSerializable
      */
     private function undoneBy(ModelMap $map, Connection $connection, ?array $before, array $restore = []): void
     {
-        $connection->afterRollback(function () use ($map, $before, $restore): void {
+        $changes = $this->savedChanges;
+        $connection->afterRollback(function () use ($map, $before, $restore, $changes): void {
             $this->storedValues = $before;
+            $this->savedChanges = $changes;
             foreach ($restore as $name => $was) {
                 match (true) {
                     $was === false => $map->forget($this, $name),
@@ -519,6 +597,7 @@ abstract class Model implements \JsonSerializable
             $map->assign($this, $name, $values[$name]);
         }
         $this->storedValues = $fresh->storedValues;
+        $this->savedChanges = [];
         foreach ($map->relations as $name => $_) {
             unset($this->{$name});
         }

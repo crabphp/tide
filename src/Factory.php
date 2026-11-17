@@ -18,6 +18,7 @@ namespace Crab\Tide;
  *
  *     $books = BookFactory::new()->count(3)->for('author', $ada)->state(['votes' => 10])->create();
  *     $draft = BookFactory::new()->state(fn (Book $book) => $book->status = Status::Draft)->createOne();
+ *     $ada = AuthorFactory::new()->has('books', BookFactory::new()->count(3))->createOne();
  *
  * A factory is never changed: each method returns a new one, so a shared one can be built on.
  *
@@ -34,6 +35,10 @@ abstract class Factory
      * @var list<\Closure(T, int): mixed>
      */
     private array $states = [];
+    /**
+     * @var list<array{string, Factory}> The relations create() fills, with the factory of their models.
+     */
+    private array $children = [];
 
     final public function __construct() {}
 
@@ -101,11 +106,39 @@ abstract class Factory
     }
 
     /**
+     * Each model is created with related models of its own, from another
+     * factory: a HasMany, HasOne, MorphMany or MorphOne gets their key, and a
+     * many-to-many relation links them. The relation holds them afterwards.
+     * Only create() writes them; a BelongsTo is for().
+     *
+     * @template R of Model
+     * @param Factory<R> $related
+     */
+    public function has(string $relation, self $related): static
+    {
+        $factory = clone $this;
+        $factory->children[] = [$relation, $related];
+        return $factory;
+    }
+
+    /**
      * The models, not saved.
      *
      * @return list<T>
      */
     public function make(): array
+    {
+        if ($this->children !== []) {
+            throw new \LogicException(static::class
+            . '::make() cannot give models related ones from has(), which need their keys; call create().');
+        }
+        return $this->built();
+    }
+
+    /**
+     * @return list<T>
+     */
+    private function built(): array
     {
         $models = [];
         for ($i = 0; $i < $this->count; $i++) {
@@ -130,11 +163,88 @@ abstract class Factory
      */
     public function create(): array
     {
-        $models = $this->make();
+        $models = $this->built();
         foreach ($models as $model) {
-            $model->save();
+            $this->saved($model);
         }
         return $models;
+    }
+
+    /**
+     * Saves one of this factory's models, then creates its related models from has().
+     *
+     * @param T $model
+     */
+    private function saved(Model $model): void
+    {
+        $model->save();
+        foreach ($this->children as [$relation, $factory]) {
+            $factory->createFor($model, $relation);
+        }
+    }
+
+    /**
+     * Creates this factory's models as the related models of one parent.
+     */
+    private function createFor(Model $parent, string $name): void
+    {
+        $map = ModelMap::of($parent::class);
+        $relation = $map->relation($name);
+        $attribute = $relation->attribute;
+        if ($attribute instanceof BelongsTo || $attribute instanceof MorphTo) {
+            throw new \LogicException(
+                "{$relation->where} belongs to its owner; make the owner first and give it with for('{$name}', \$owner).",
+            );
+        }
+        [$related, $local, $foreign] = $relation->keys($map);
+        $children = $this->built();
+        foreach ($children as $child) {
+            if ($child::class !== $related->class) {
+                throw new \LogicException(
+                    "{$relation->where} relates {$related->class}; give has() a factory of them, not of "
+                    . $child::class
+                    . '.',
+                );
+            }
+        }
+        if ($attribute instanceof BelongsToMany) {
+            foreach ($children as $child) {
+                $this->saved($child);
+            }
+            $parent->attach($name, array_map(static fn(Model $child): int|string => self::key(
+                $related,
+                $child,
+                $foreign->property,
+            ), $children));
+            // @mago-expect analysis:string-member-selector
+            $parent->{$name} = $children;
+            return;
+        }
+        $key = self::key($map, $parent, $local->property);
+        $morph = $relation->morphType($map);
+        foreach ($children as $child) {
+            $related->assign($child, $foreign->property, $key);
+            if ($morph !== null) {
+                $related->assign($child, $related->columns[$morph[0]]->property, $morph[1]);
+            }
+            $this->saved($child);
+        }
+        $single = $attribute instanceof HasOne || $attribute instanceof MorphOne;
+        // @mago-expect analysis:string-member-selector
+        $parent->{$name} = $single ? $children[0] ?? null : $children;
+    }
+
+    /**
+     * A key a saved model holds, which is an int or a string.
+     */
+    private static function key(ModelMap $map, Model $model, string $property): int|string
+    {
+        // @mago-expect analysis:mixed-assignment
+        $key = $map->value($model, $property);
+        if (!is_int($key) && !is_string($key)) {
+            throw new \LogicException($model::class . "::\${$property} holds no key; save the model first.");
+        }
+        return $key;
     }
 
     /**

@@ -1,6 +1,6 @@
 # Tide architecture
 
-Status: **released as 0.3.1, 2026-11-17.** The framework's own design is in [../framework/ARCHITECTURE.md](../framework/ARCHITECTURE.md), and this document follows its goals, layers and scopes.
+Status: **released as 0.3.2, 2026-11-17.** The framework's own design is in [../framework/ARCHITECTURE.md](../framework/ARCHITECTURE.md), and this document follows its goals, layers and scopes.
 
 ## What it is
 
@@ -134,7 +134,7 @@ A model is a concrete class that extends `Crab\Tide\Model`. Nothing else is requ
 
 ### State
 
-A model keeps one thing of its own: the values it was read with, or null while it is new. That is how `save()` knows whether to insert, and what changed. The snapshot is keyed by property name and holds raw property values. A mutable `DateTime` is copied to `DateTimeImmutable`, including when held by a `DateTimeInterface` or `mixed` column. For a cast whose value is an object it instead holds the written column value, so in-place mutation is detected. Database-filled columns left uninitialized by an insert are absent until they are read or assigned.
+A model keeps two things of its own: the values it was read with, or null while it is new, and the names of the properties its last `save()` wrote. The first is how `save()` knows whether to insert, and what changed, and how `isDirty()` and `original()` answer; the second answers `wasChanged()`. A rollback restores both. The snapshot is keyed by property name and holds raw property values. A mutable `DateTime` is copied to `DateTimeImmutable`, including when held by a `DateTimeInterface` or `mixed` column. For a cast whose value is an object it instead holds the written column value, so in-place mutation is detected. Database-filled columns left uninitialized by an insert are absent until they are read or assigned.
 
 | Case | Rule |
 | --- | --- |

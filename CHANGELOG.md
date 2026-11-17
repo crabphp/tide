@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.3.2 — 2026-11-17
+
+- `wasChanged()` and `wasChanged('status')` say whether the last `save()` wrote any column, or those named. A rollback takes it back with the write. A model now keeps the names of the properties its last save wrote beside its snapshot.
+- `Model::loadCount($posts, 'comments')` reads `#[Count]` properties into models already read, as `withCount()` does for a query, with conditions too.
+- `Factory::has('books', BookFactory::new()->count(3))` creates related models for each model a factory creates, nested as deep as needed: a `HasMany`, `HasOne`, `MorphMany` or `MorphOne` gets the key, and a many-to-many relation links them.
+- `composer analyze` runs Mago's static analysis, which now sees the framework and PHPUnit, against a baseline of its starting findings.
+
 ## 0.3.1 — 2026-11-17
 
 - `withCount('comments')` reads how many related rows each model has into a `#[Count('comments')] public int $comments_count;` property, with a subquery in the same statement. A count is no column: `save()` never writes it, and it is uninitialised until a query asks for it. A count with a condition has a property of its own, named to `withCount()` with a closure after it. Counts work with `select()`, pages and relation constraints.

@@ -51,7 +51,7 @@ final class ReadmeTest extends DatabaseTestCase
             $source =
                 "<?php\ndeclare(strict_types=1);\nnamespace {$namespace};\n"
                 . implode("\n", $blocks)
-                . "\nreturn [\$books, \$page, \$recent, \$json, \$copy, \$count, \$names, \$titles, \$light, \$commented, \$owners, \$rows, \$counted, \$scoped, \$made, \$draft, \$posts, \$changed, \$found];\n";
+                . "\nreturn [\$books, \$page, \$recent, \$json, \$copy, \$count, \$names, \$titles, \$light, \$commented, \$owners, \$rows, \$counted, \$scoped, \$made, \$draft, \$posts, \$changed, \$found, \$prolific];\n";
             file_put_contents($directory . '/examples.php', $source);
             [
                 $books,
@@ -73,6 +73,7 @@ final class ReadmeTest extends DatabaseTestCase
                 $posts,
                 $changed,
                 $found,
+                $prolific,
             ] = require $directory . '/examples.php';
             self::assertSame(1, $count);
             self::assertSame('{"id":1,"title":"PHP"}', json_encode($titles[0], JSON_THROW_ON_ERROR));
@@ -89,11 +90,13 @@ final class ReadmeTest extends DatabaseTestCase
             self::assertSame([1, 1], [$posts[0]->comments_count, $posts[0]->long_comments_count]);
             self::assertTrue($changed);
             self::assertSame(1, $found->id);
+            self::assertCount(2, $prolific->books);
+            self::assertSame($prolific->id, $prolific->books[0]->author_id);
             self::assertCount(1, $books);
             self::assertCount(1, $page);
             self::assertCount(1, $recent);
             self::assertTrue($copy->stored());
-            self::assertSame(5, $database->table('books')->count());
+            self::assertSame(7, $database->table('books')->count());
             $decoded = json_decode($json, true, flags: JSON_THROW_ON_ERROR);
             self::assertSame('First', $decoded['author']['name']);
             self::assertArrayNotHasKey('internal_note', $decoded);

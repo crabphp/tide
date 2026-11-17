@@ -29,6 +29,7 @@ final class Author extends Model
 {
     public int $id;
     public string $name;
+    /** @var list<Book> */
     #[HasMany(Book::class, 'author_id')]
     public array $books;
     #[Count('books')]
@@ -175,5 +176,44 @@ final class BookFactory extends Factory
     protected function definition(int $sequence): Book
     {
         return new Book("Made {$sequence}");
+    }
+}
+
+/**
+ * @extends Factory<Author>
+ */
+final class AuthorFactory extends Factory
+{
+    protected function definition(int $sequence): Author
+    {
+        $author = new Author();
+        $author->name = "Author {$sequence}";
+        return $author;
+    }
+}
+
+/**
+ * @extends Factory<Chapter>
+ */
+final class ChapterFactory extends Factory
+{
+    protected function definition(int $sequence): Chapter
+    {
+        $chapter = new Chapter();
+        $chapter->title = "Chapter {$sequence}";
+        return $chapter;
+    }
+}
+
+/**
+ * @extends Factory<Tag>
+ */
+final class TagFactory extends Factory
+{
+    protected function definition(int $sequence): Tag
+    {
+        $tag = new Tag();
+        $tag->name = "Tag {$sequence}";
+        return $tag;
     }
 }

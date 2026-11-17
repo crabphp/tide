@@ -8,16 +8,23 @@ use Crab\Tide\Count;
 use Crab\Tide\Model;
 use Crab\Tide\ModelMap;
 use Crab\Tide\ModelQuery;
+use Crab\Tide\MorphMany;
+use Crab\Tide\MorphTo;
 use Crab\Tide\Table;
 use Crab\Tide\Tests\Support\Author;
+use Crab\Tide\Tests\Support\AuthorFactory;
 use Crab\Tide\Tests\Support\Book;
 use Crab\Tide\Tests\Support\BookFactory;
 use Crab\Tide\Tests\Support\BookQuery;
 use Crab\Tide\Tests\Support\Category;
+use Crab\Tide\Tests\Support\Chapter;
+use Crab\Tide\Tests\Support\ChapterFactory;
 use Crab\Tide\Tests\Support\DatabaseTestCase;
 use Crab\Tide\Tests\Support\Money;
 use Crab\Tide\Tests\Support\Price;
 use Crab\Tide\Tests\Support\Status;
+use Crab\Tide\Tests\Support\Tag;
+use Crab\Tide\Tests\Support\TagFactory;
 use PHPUnit\Framework\Attributes\DataProvider;
 
 final class ConvenienceTest extends DatabaseTestCase
@@ -38,15 +45,15 @@ final class ConvenienceTest extends DatabaseTestCase
     public function testACountIsUninitialisedUnlessAskedForAndNeverSaved(string $driver): void
     {
         $this->start($driver);
-        $book = Book::find(1);
+        $book = Book::findOrFail(1);
         self::assertFalse(isset($book->chapters_count));
         self::assertArrayNotHasKey('chapters_count', json_decode(json_encode($book), true));
-        $counted = Book::query()->withCount('chapters')->find(1);
+        $counted = Book::query()->withCount('chapters')->findOrFail(1);
         $counted->chapters_count = 99;
         self::assertFalse($counted->isDirty());
         $counted->title = 'Changed';
         $counted->save();
-        self::assertSame('Changed', Book::find(1)->title);
+        self::assertSame('Changed', Book::findOrFail(1)->title);
     }
 
     #[DataProvider('drivers')]
@@ -78,7 +85,7 @@ final class ConvenienceTest extends DatabaseTestCase
         $page = Book::query()->withCount('chapters')->select('title')->orderBy('id')->paginate(2);
         self::assertSame(4, $page->total);
         self::assertSame(2, $page->items[0]->chapters_count);
-        self::assertSame(1, Book::query()->select('title')->withCount('chapters')->find(2)->chapters_count);
+        self::assertSame(1, Book::query()->select('title')->withCount('chapters')->findOrFail(2)->chapters_count);
         self::assertSame(4, Book::query()->withCount('chapters')->count());
         self::assertTrue(Book::query()->withCount('chapters')->exists());
         $tree = Category::query()->withCount('children')->orderBy('id')->get();
@@ -91,7 +98,7 @@ final class ConvenienceTest extends DatabaseTestCase
         $this->start($driver);
         $ada = Author::query()
             ->with('books', static fn(BookQuery $q) => $q->withCount('chapters'))
-            ->find(1);
+            ->findOrFail(1);
         self::assertSame([2, 1], array_map(static fn(Book $b): int => $b->chapters_count, $ada->books));
     }
 
@@ -124,20 +131,20 @@ final class ConvenienceTest extends DatabaseTestCase
     public function testSaveWithValuesAssignsThemAndWritesOnlyThose(string $driver): void
     {
         $this->start($driver);
-        $book = Book::find(1);
+        $book = Book::findOrFail(1);
         $book->save(['title' => 'Renamed', 'author_id' => 2]);
         self::assertSame('Renamed', $book->title);
-        $fresh = Book::find(1);
+        $fresh = Book::findOrFail(1);
         self::assertSame(['Renamed', 2], [$fresh->title, $fresh->author_id]);
         $new = new Book('New')->save(['votes' => 7]);
-        self::assertSame(7, Book::find($new->id)->votes);
+        self::assertSame(7, Book::findOrFail($new->id)->votes);
     }
 
     #[DataProvider('drivers')]
     public function testSaveRefusesANameThatIsNoColumnBeforeAssigningAny(string $driver): void
     {
         $this->start($driver);
-        $book = Book::find(1);
+        $book = Book::findOrFail(1);
         foreach (['author', 'chapters_count', 'titel'] as $name) {
             try {
                 $book->save(['title' => 'Changed', $name => null]);
@@ -156,7 +163,7 @@ final class ConvenienceTest extends DatabaseTestCase
     public function testAValueOfTheWrongTypeLeavesTheModelAsItWas(string $driver): void
     {
         $this->start($driver);
-        $book = Book::find(1);
+        $book = Book::findOrFail(1);
         try {
             $book->save(['title' => 'Changed', 'votes' => 'many']);
             self::fail('A string was assigned to an int.');
@@ -164,7 +171,7 @@ final class ConvenienceTest extends DatabaseTestCase
         }
         self::assertSame('Alpha', $book->title);
         self::assertFalse($book->isDirty());
-        $partial = Book::query()->select('title')->find(1);
+        $partial = Book::query()->select('title')->findOrFail(1);
         try {
             $partial->save(['votes' => 5, 'author_id' => 'x']);
         } catch (\TypeError) {
@@ -178,7 +185,7 @@ final class ConvenienceTest extends DatabaseTestCase
     public function testDirtyIsWhatSaveWouldWrite(string $driver): void
     {
         $this->start($driver);
-        $book = Book::find(1);
+        $book = Book::findOrFail(1);
         self::assertFalse($book->isDirty());
         self::assertSame([], $book->dirty());
         $book->title = 'Alpha';
@@ -218,7 +225,7 @@ final class ConvenienceTest extends DatabaseTestCase
         self::assertTrue($price->isDirty('amount'));
         self::assertEquals(new Money(100), $price->original('amount'));
         $this->expectExceptionMessage("original('votes') has no value: the query did not read it");
-        Book::query()->select('title')->find(1)->original('votes');
+        Book::query()->select('title')->findOrFail(1)->original('votes');
     }
 
     #[DataProvider('drivers')]
@@ -226,7 +233,7 @@ final class ConvenienceTest extends DatabaseTestCase
     {
         $this->start($driver);
         $this->expectExceptionMessage('isDirty() names "author", which is not one of its columns');
-        Book::find(1)->isDirty('author');
+        Book::findOrFail(1)->isDirty('author');
     }
 
     // firstOrNew(), firstOrCreate(), updateOrCreate()
@@ -262,19 +269,21 @@ final class ConvenienceTest extends DatabaseTestCase
             ->where('title', 'Beta')
             ->updateOrCreate(static fn() => new Book('Beta'), static fn(Book $b) => $b->votes = 20);
         self::assertSame(2, $updated->id);
-        self::assertSame(20, Book::find(2)->votes);
+        self::assertSame(20, Book::findOrFail(2)->votes);
         $created = Book::query()
             ->where('title', 'Eta')
             ->updateOrCreate(static fn() => new Book('Eta'), static fn(Book $b) => $b->votes = 30);
-        self::assertSame(30, Book::find($created->id)->votes);
+        self::assertSame(30, Book::findOrFail($created->id)->votes);
     }
 
     #[DataProvider('drivers')]
     public function testTheClosureMustMakeANewModelOfTheQuerysClass(string $driver): void
     {
         $this->start($driver);
-        foreach ([static fn() => new Author(), static fn() => Book::find(1)] as $make) {
+        foreach ([static fn() => new Author(), static fn() => Book::findOrFail(1)] as $make) {
             try {
+                // The wrong model, on purpose.
+                // @mago-expect analysis:possibly-invalid-argument
                 Book::query()->where('title', 'Nowhere')->firstOrCreate($make);
                 self::fail('The closure gave the wrong model.');
             } catch (\LogicException $error) {
@@ -289,7 +298,7 @@ final class ConvenienceTest extends DatabaseTestCase
     public function testAModelsOwnQueryClassChainsAnywhereAndInRelations(string $driver): void
     {
         $this->start($driver);
-        $ada = Author::find(1);
+        $ada = Author::findOrFail(1);
         self::assertInstanceOf(BookQuery::class, Book::query());
         self::assertSame(['Beta'], Book::query()->by($ada)->popular(2)->pluck('title'));
         self::assertSame(['Gamma', 'Delta'], Book::query()->orderBy('id')->popular()->pluck('title'));
@@ -297,7 +306,7 @@ final class ConvenienceTest extends DatabaseTestCase
         self::assertSame(['Beta'], $ada->related('books')->popular(2)->pluck('title'));
         $loaded = Author::query()
             ->with('books', static fn(BookQuery $q) => $q->popular(2))
-            ->find(1);
+            ->findOrFail(1);
         self::assertSame(['Beta'], array_map(static fn(Book $b): string => $b->title, $loaded->books));
         self::assertSame(
             [2],
@@ -346,13 +355,159 @@ final class ConvenienceTest extends DatabaseTestCase
         Book::query()->latest();
     }
 
+    // wasChanged()
+
+    #[DataProvider('drivers')]
+    public function testWasChangedSaysWhatTheLastSaveWrote(string $driver): void
+    {
+        $this->start($driver);
+        $book = Book::findOrFail(1);
+        self::assertFalse($book->wasChanged());
+        $book->status = Status::Published;
+        self::assertFalse($book->wasChanged('status'));
+        $book->save();
+        self::assertTrue($book->wasChanged());
+        self::assertTrue($book->wasChanged('title', 'status'));
+        self::assertFalse($book->wasChanged('title'));
+        $book->save();
+        self::assertFalse($book->wasChanged(), 'A save that changed nothing wrote nothing.');
+        $new = new Book('Fresh');
+        $new->save();
+        self::assertTrue($new->wasChanged('title'));
+        $new->refresh();
+        self::assertFalse($new->wasChanged());
+    }
+
+    #[DataProvider('drivers')]
+    public function testARolledBackSaveTakesBackWhatItChanged(string $driver): void
+    {
+        $this->start($driver);
+        $book = Book::findOrFail(1);
+        $book->save(['title' => 'Once']);
+        try {
+            $this->db->transaction(static function () use ($book): void {
+                $book->save(['votes' => 50]);
+                self::assertTrue($book->wasChanged('votes'));
+                throw new \RuntimeException('roll back');
+            });
+        } catch (\RuntimeException) {
+        }
+        self::assertTrue($book->wasChanged('title'));
+        self::assertFalse($book->wasChanged('votes'));
+    }
+
+    #[DataProvider('drivers')]
+    public function testWasChangedNamesOnlyColumns(string $driver): void
+    {
+        $this->start($driver);
+        $this->expectExceptionMessage('wasChanged() names "author", which is not one of its columns');
+        Book::findOrFail(1)->wasChanged('author');
+    }
+
+    // loadCount()
+
+    #[DataProvider('drivers')]
+    public function testLoadCountReadsCountsIntoModelsAlreadyRead(string $driver): void
+    {
+        $this->start($driver);
+        $books = Book::query()->orderBy('id')->get();
+        $books[] = Book::findOrFail(1);
+        Book::loadCount($books, 'chapters', 'tags');
+        self::assertSame([2, 1, 0, 0, 2], array_map(static fn(Book $b): int => $b->chapters_count, $books));
+        self::assertSame([2, 1, 0, 0, 2], array_map(static fn(Book $b): int => $b->tags_count, $books));
+        self::assertSame('Alpha', $books[0]->title);
+        $authors = Author::query()->orderBy('id')->get();
+        Author::loadCount($authors, 'popular_books_count', static fn(BookQuery $q) => $q->popular(2));
+        self::assertSame([1, 1], [$authors[0]->popular_books_count, $authors[1]->popular_books_count]);
+        self::assertFalse(isset($authors[0]->books_count));
+    }
+
+    #[DataProvider('drivers')]
+    public function testLoadCountNeedsStoredModelsOfItsClass(string $driver): void
+    {
+        $this->start($driver);
+        Book::loadCount([], 'chapters');
+        $this->expectExceptionMessage('loadCount() needs stored models of that class');
+        Book::loadCount([new Book('New')], 'chapters');
+    }
+
+    // Factory has()
+
+    #[DataProvider('drivers')]
+    public function testHasCreatesRelatedModelsForEachParentNestedAndLinked(string $driver): void
+    {
+        $this->start($driver);
+        $authors = AuthorFactory::new()
+            ->count(2)
+            ->has('books', BookFactory::new()->count(2)->has('chapters', ChapterFactory::new()->count(3)))
+            ->create();
+        foreach ($authors as $author) {
+            self::assertCount(2, $author->books);
+            foreach ($author->books as $book) {
+                self::assertSame($author->id, $book->author_id);
+                self::assertCount(3, $book->chapters);
+                self::assertSame(3, Chapter::query()->where('book_id', $book->id)->count());
+            }
+        }
+        $tagged = BookFactory::new()->has('tags', TagFactory::new()->count(2))->createOne();
+        $linked = Book::query()->with('tags')->findOrFail($tagged->id)->tags;
+        self::assertCount(2, $linked);
+        self::assertSame(
+            array_map(static fn(Tag $t): int => $t->id, $tagged->tags),
+            array_map(static fn(Tag $t): int => $t->id, $linked),
+        );
+    }
+
+    #[DataProvider('drivers')]
+    public function testHasFillsAMorphManysTypeColumn(string $driver): void
+    {
+        $this->start($driver);
+        $id = $driver === 'sqlite' ? 'integer primary key autoincrement' : 'integer auto_increment primary key';
+        $this->db->execute('drop table if exists tide_strings');
+        $this->db->execute(
+            "create table tide_strings (id {$id}, owner_type varchar(20) not null, owner_id integer not null, body varchar(100) not null)",
+        );
+        $book = NotedBookFactory::new()->has('notes', OwnedNoteFactory::new()->count(2))->createOne();
+        self::assertCount(2, $book->notes);
+        self::assertSame(['tide_books', 'tide_books'], $this->db->table('tide_strings')->pluck('owner_type'));
+        self::assertSame(
+            [$book->id, $book->id],
+            array_map('intval', $this->db->table('tide_strings')->pluck('owner_id')),
+        );
+        self::assertCount(2, NotedBook::query()->with('notes')->findOrFail($book->id)->notes);
+    }
+
+    #[DataProvider('drivers')]
+    public function testHasRefusesMakeABelongsToAndAnotherModelsFactory(string $driver): void
+    {
+        $this->start($driver);
+        foreach ([
+            'call create()' => static fn() => AuthorFactory::new()->has('books', BookFactory::new())->make(),
+            "give it with for('author'" => static fn() => BookFactory::new()->has(
+                'author',
+                AuthorFactory::new(),
+            )->create(),
+            'give has() a factory of them' => static fn() => AuthorFactory::new()->has(
+                'books',
+                TagFactory::new(),
+            )->create(),
+        ] as $message => $attempt) {
+            try {
+                $attempt();
+                self::fail($message);
+            } catch (\LogicException $error) {
+                self::assertStringContainsString($message, $error->getMessage());
+            }
+        }
+    }
+
     // Factories
 
     #[DataProvider('drivers')]
     public function testAFactoryMakesAndCreatesWithStatesAndOwners(string $driver): void
     {
         $this->start($driver);
-        $grace = Author::find(2);
+        $grace = Author::findOrFail(2);
         $books = BookFactory::new()
             ->count(3)
             ->for('author', $grace)
@@ -362,7 +517,7 @@ final class ConvenienceTest extends DatabaseTestCase
         self::assertCount(3, $books);
         foreach ($books as $book) {
             self::assertTrue($book->stored());
-            self::assertSame(9, Book::find($book->id)->votes);
+            self::assertSame(9, Book::findOrFail($book->id)->votes);
             self::assertSame(2, $book->author_id);
             self::assertSame($grace, $book->author);
             self::assertStringEndsWith('!', $book->title);
@@ -432,4 +587,50 @@ final class Plain extends Model
 final class Named extends Model
 {
     public int $id;
+}
+
+#[Table('tide_books')]
+final class NotedBook extends Model
+{
+    public int $id;
+    public string $title;
+    #[MorphMany(OwnedNote::class)]
+    public array $notes;
+}
+
+#[Table('tide_strings')]
+final class OwnedNote extends Model
+{
+    public int $id;
+    public string $owner_type;
+    public int $owner_id;
+    public string $body;
+    #[MorphTo]
+    public NotedBook $owner;
+}
+
+/**
+ * @extends \Crab\Tide\Factory<NotedBook>
+ */
+final class NotedBookFactory extends \Crab\Tide\Factory
+{
+    protected function definition(int $sequence): NotedBook
+    {
+        $book = new NotedBook();
+        $book->title = "Noted {$sequence}";
+        return $book;
+    }
+}
+
+/**
+ * @extends \Crab\Tide\Factory<OwnedNote>
+ */
+final class OwnedNoteFactory extends \Crab\Tide\Factory
+{
+    protected function definition(int $sequence): OwnedNote
+    {
+        $note = new OwnedNote();
+        $note->body = "Note {$sequence}";
+        return $note;
+    }
 }
