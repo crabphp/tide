@@ -16,6 +16,10 @@ jobs:
   ci:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['8.4', '8.5', '8.6']
     services:
       mysql:
         image: mysql:8.4
@@ -44,7 +48,7 @@ jobs:
           path: framework
       - uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.4'
+          php-version: ${{ matrix.php }}
           extensions: mbstring, pcntl, posix, sockets, pdo_sqlite, pdo_mysql
           coverage: none
       - run: composer validate --strict
